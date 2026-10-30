@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ivelt Helper v2 for Safari / Tampermonkey
 // @namespace    https://github.com/YankyAppel/ivelt-helper
-// @version      2.2.0
+// @version      2.2.1
 // @updateURL    https://raw.githubusercontent.com/YankyAppel/ivelt-helper/main/ivelt-helper.user.js
 // @downloadURL  https://raw.githubusercontent.com/YankyAppel/ivelt-helper/main/ivelt-helper.user.js
 // @description  Port of chucem/ivelt-helper v2 for Tampermonkey: keyboard shortcuts, quote/ping/copy/commentary buttons, quote-selection, who-liked, profile cards, drafts, spoiler polish, editor undo, image resizer/paste, split notifications, multi-page print, media embed. Auto-updates from GitHub.
@@ -831,7 +831,12 @@
             }
           });
         };
-        window.addEventListener('scroll', checkStickyPosition);
+        let stickyTick = false;
+        window.addEventListener('scroll', () => {
+          if (stickyTick) return;
+          stickyTick = true;
+          requestAnimationFrame(() => { stickyTick = false; checkStickyPosition(); });
+        }, { passive: true });
         checkStickyPosition();
       }
     }
@@ -1252,18 +1257,26 @@
     inboxNotificationCheck();
   }
 
-  let mutating = false;
-  const observer = new MutationObserver(() => {
-    if (mutating) return;
-    mutating = true;
-    refreshSettingsDiv();
-    addTopicButtons();
-    addGoogleSearch();
-    embedMedia();
-    pageEnhancements();
-    addPrintBtn();
-    splitNotifications();
-    mutating = false;
+  const OWN_INJECTION = '.custom-btn, #iveltHelperSettings, #ivelt-helper-settings, .ivelt-media__root, .ih-likes, .ih-draft-bar, .ih-profile-card, .ext-copied-tip, #ivelt-helper-v2-styles, .ih-spoiler-words, .ih-spoiler-picture';
+  function isOwnMutation(m) {
+    if (m.target.nodeType === 1 && m.target.closest && m.target.closest(OWN_INJECTION)) return true;
+    return m.addedNodes.length > 0 && [...m.addedNodes].every(n =>
+      n.nodeType !== 1 || (n.matches && n.matches(OWN_INJECTION)));
+  }
+  let observerTimer = null;
+  const observer = new MutationObserver((mutations) => {
+    if (observerTimer) return;                       // coalesce bursts into one pass
+    if (mutations.every(isOwnMutation)) return;      // ignore DOM changes we caused ourselves
+    observerTimer = setTimeout(() => {
+      observerTimer = null;
+      refreshSettingsDiv();
+      addTopicButtons();
+      addGoogleSearch();
+      embedMedia();
+      pageEnhancements();
+      addPrintBtn();
+      splitNotifications();
+    }, 250);
   });
 
 
