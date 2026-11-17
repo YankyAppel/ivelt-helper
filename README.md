@@ -10,6 +10,17 @@ A port of [chucem/ivelt-helper](https://github.com/chucem/ivelt-helper) (Chrome 
    Tampermonkey will offer to install it — tap **Install**.
 3. Visit https://www.ivelt.com/forum — done.
 
+## Voice scripts
+
+The voice features are intentionally split into two independent Tampermonkey scripts:
+
+- `ivelt-reading.user.js` — adds iVelt-styled read buttons and a fixed mobile control bar. It can read one post or play unread posts in sequence.
+- `ivelt-talking.user.js` — adds a talk button beside the post box. It inserts the recognized Yiddish text and detects when that inserted text is corrected.
+
+Install both scripts if you want both features. Install only `ivelt-reading.user.js` to turn off talking, or only `ivelt-talking.user.js` to turn off reading.
+
+When recognized text is changed, the talking script shows the original and corrected text. Tapping `שיקן` sends the correction to the existing training endpoint as `ivelt_transcript_fix`; it does not send anything automatically or include unrelated posts.
+
 ## Auto-updates
 
 The script's `@updateURL` points at this repo, so Tampermonkey checks GitHub for a newer `@version` automatically (about once a day; or Tampermonkey → script → "Check for updates" to force it). Just bump `@version` on `main` to release.
