@@ -1411,6 +1411,7 @@ var KOL_TEXT_DATA = {"version":"kaggle-2.9 (2026-11-01, abbreviations + referenc
     async function startRec() {
       var st = null;
       try {
+        if (navigator.audioSession) try { navigator.audioSession.type = "play-and-record"; } catch (x) {}
         st = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
         var ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") await ac.resume();
         var src = ac.createMediaStreamSource(st), sp = ac.createScriptProcessor(4096, 1, 1), chunks = [];
