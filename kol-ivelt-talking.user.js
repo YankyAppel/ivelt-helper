@@ -1439,7 +1439,7 @@ var KOL_TEXT_DATA = {"version":"kaggle-2.9 (2026-11-01, abbreviations + referenc
   boxTools.push(sttTool);
   window.KolIvelt = {
     version: H.version,
-    insertText: function (ta, text) { var s = ta.selectionStart || ta.value.length, e = ta.selectionEnd || s; ta.value = ta.value.slice(0, s) + text + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + text.length; ta.dispatchEvent(new Event("input", { bubbles: true })); }
+    insertText: function (ta, text) { var s = typeof ta.selectionStart === "number" ? ta.selectionStart : ta.value.length, e = typeof ta.selectionEnd === "number" ? ta.selectionEnd : s; ta.value = ta.value.slice(0, s) + text + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + text.length; ta.dispatchEvent(new Event("input", { bubbles: true })); }
   };
   function boot() {
     postBoxes();
