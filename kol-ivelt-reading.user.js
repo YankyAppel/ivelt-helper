@@ -1429,7 +1429,7 @@ var KOL_TEXT_DATA = {"version":"kaggle-2.9 (2026-11-01, abbreviations + referenc
   function postsOnPage() { return Array.prototype.slice.call(document.querySelectorAll("div.post[id^='p']")).filter(function (p) { return /^p\d+$/.test(p.id) && p.querySelector(".content"); }); }
   function unreadPosts() {
     var ps = postsOnPage(), u = ps.filter(function (p) { return p.classList.contains("unreadpost") || p.querySelector(".author .icon-red, .author a.unread i.icon-red"); });
-    if (!u.length) { var a = document.getElementById("unread"); if (a) { var start = -1; ps.forEach(function (p, i) { if (start < 0 && (a.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING)) start = i; }); if (start >= 0) u = ps.slice(start); } }
+    if (!u.length) { var a = document.getElementById("unread"); if (a) { var owner = a.closest && a.closest(".post"), start = owner ? ps.indexOf(owner) : -1; if (start < 0) ps.forEach(function (p, i) { if (start < 0 && (a.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING)) start = i; }); if (start >= 0) u = ps.slice(start); } }
     return u;
   }
   function heard() { try { return JSON.parse(LS.getItem(HEARDK) || "[]"); } catch (e) { return []; } }
