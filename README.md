@@ -10,6 +10,11 @@ A port of [chucem/ivelt-helper](https://github.com/chucem/ivelt-helper) (Chrome 
    Tampermonkey will offer to install it — tap **Install**.
 3. Visit https://www.ivelt.com/forum — done.
 
+For the PDF-derived voice features, install these links separately:
+
+- **Reading:** https://raw.githubusercontent.com/YankyAppel/ivelt-helper/main/kol-ivelt-reading.user.js
+- **Talking:** https://raw.githubusercontent.com/YankyAppel/ivelt-helper/main/kol-ivelt-talking.user.js
+
 ## Voice scripts
 
 The Kol voice script from the supplied PDF is split into two independent Tampermonkey userscripts:
