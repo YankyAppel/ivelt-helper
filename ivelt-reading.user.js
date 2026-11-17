@@ -160,9 +160,17 @@
   }
 
   function playUnread() {
-    const queue = posts().filter((post) => post.classList.contains('unread') ||
+    const allPosts = posts();
+    const unreadAnchor = document.getElementById('unread') || document.querySelector('a[name="unread"]');
+    const anchorPost = unreadAnchor && (
+      unreadAnchor.closest('.post') ||
+      unreadAnchor.nextElementSibling?.closest('.post')
+    );
+    const anchorIndex = anchorPost ? allPosts.indexOf(anchorPost) : -1;
+    const queue = allPosts.filter((post) => post.classList.contains('unread') ||
       post.matches('[data-unread="1"]') ||
-      post.querySelector('.unread, a.unread, .post-unread, [data-unread="1"]'));
+      post.querySelector('.unread, a.unread, .post-unread, [data-unread="1"]') ||
+      (anchorIndex >= 0 && allPosts.indexOf(post) >= anchorIndex));
     if (queue.length) speak(queue[0], queue, 0);
     else toast('קיין אומגעלייענטע תגובות נישט געפונען');
   }
