@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         קול – ivelt רעדן (Kol: Yiddish voice for ivelt)
 // @namespace    https://kol-status-q7m4x2.sites.tab.bot/
-// @version      1.1.0
+// @version      1.1.1
 // @description  Talk into an iVelt post box using the same on-device listening model from Kol.
 // @match        https://www.ivelt.com/*
 // @match        https://ivelt.com/*
