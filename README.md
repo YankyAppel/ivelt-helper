@@ -12,14 +12,12 @@ A port of [chucem/ivelt-helper](https://github.com/chucem/ivelt-helper) (Chrome 
 
 ## Voice scripts
 
-The voice features are intentionally split into two independent Tampermonkey scripts:
+The Kol voice script from the supplied PDF is split into two independent Tampermonkey userscripts:
 
-- `ivelt-reading.user.js` — adds iVelt-styled read buttons and a fixed mobile control bar. It can read one post or play unread posts in sequence.
-- `ivelt-talking.user.js` — adds a talk button beside the post box. It inserts the recognized Yiddish text and detects when that inserted text is corrected.
+- `kol-ivelt-reading.user.js` — the original on-device voice engine, per-post reading, unread playback, wrong-word reports, correction recordings, queueing, diagnostics, and settings.
+- `kol-ivelt-talking.user.js` — the same on-device listening model and microphone flow, limited to the talk-to-text controls beside iVelt's post box.
 
-Install both scripts if you want both features. Install only `ivelt-reading.user.js` to turn off talking, or only `ivelt-talking.user.js` to turn off reading.
-
-When recognized text is changed, the talking script shows the original and corrected text. Tapping `שיקן` sends the correction to the existing training endpoint as `ivelt_transcript_fix`; it does not send anything automatically or include unrelated posts.
+The scripts retain the PDF's 79 MB first-use listening model, offline queue, and pronunciation-training report/record flow. Install both for the complete experience; install only one when you want to disable the other half.
 
 ## Auto-updates
 

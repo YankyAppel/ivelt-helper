@@ -1,0 +1,1760 @@
+// ==UserScript==
+// @name         קול – ivelt לייענער (Kol: Yiddish voice for ivelt)
+// @namespace    https://kol-status-q7m4x2.sites.tab.bot/
+// @version      1.1.0
+// @description  Reads iVelt posts aloud with the on-device heimish Yiddish voice. Report wrong words, record corrections, and play unread posts.
+// @match        https://www.ivelt.com/*
+// @match        https://ivelt.com/*
+// @grant        GM_xmlhttpRequest
+// @grant        GM.xmlHttpRequest
+// @connect      kol-status-q7m4x2.sites.tab.bot
+// @updateURL    https://raw.githubusercontent.com/YankyAppel/ivelt-helper/main/kol-ivelt-reading.user.js
+// @downloadURL  https://raw.githubusercontent.com/YankyAppel/ivelt-helper/main/kol-ivelt-reading.user.js
+// @run-at       document-idle
+// @noframes
+// ==/UserScript==
+
+(function(){
+var s=document.createElement('style');s.textContent=".kol-ui{font-family:Arial,\"Segoe UI\",sans-serif;direction:rtl;text-align:right;box-sizing:border-box}\n.kol-ui *{box-sizing:border-box}\n.kol-b{font-size:17px;min-height:44px;min-width:44px;padding:6px 12px;margin:3px;border-radius:10px;border:1px solid #b9b2a5;background:#fff;color:#1d1d1d;cursor:pointer;line-height:1.2;font-family:inherit;touch-action:manipulation;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}\n.kol-b:disabled{opacity:.75;cursor:default}\n.kol-b.kol-main{background:#1f5f8b;color:#fff;border-color:#1f5f8b;font-weight:700}\n.kol-b.kol-rec{background:#b3261e;color:#fff;border-color:#b3261e}\n.kol-b.kol-x{background:#eee}\n.kol-b[hidden]{display:none!important}\n.kol-postbar{display:flex;flex-wrap:wrap;align-items:center;gap:2px;margin:4px 0 8px;padding:2px 0;clear:both}\n.kol-heard{color:#2e7d32;font-size:14px;margin:0 6px}\n.post.kol-active{outline:3px solid #1f5f8b;outline-offset:2px;border-radius:6px}\n.kol-panel{background:#fffbea;border:2px solid #e0c060;border-radius:12px;padding:10px;margin:0 0 10px;font-size:17px}\n.kol-panel[hidden]{display:none}\n.kol-hint{font-weight:700;margin-bottom:6px;font-size:16px}\n.kol-words{line-height:2.3;font-size:19px;max-height:46vh;overflow:auto;padding:4px;background:#fff;border-radius:8px}\n.kol-sent{border-radius:6px;padding:2px 0}\n.kol-sent.now{background:#dcecff}\n.kol-w{display:inline-block;padding:2px 6px;margin:1px;border-radius:8px;border:1px solid #ddd;cursor:pointer;min-height:36px;line-height:30px;user-select:none;-webkit-user-select:none}\n.kol-w.on{background:#d93025;color:#fff;border-color:#d93025}\n.kol-note{width:100%;font-size:17px;margin:8px 0 4px;padding:8px;border-radius:8px;border:1px solid #ccc;font-family:inherit}\n.kol-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin:4px 0}\n.kol-recst{font-size:16px;margin:0 6px;direction:ltr}\n.kol-topbar{margin:8px 0 12px;display:flex;flex-wrap:wrap}\n.kol-big{font-size:19px!important;min-height:52px!important;padding:8px 16px!important;width:100%;max-width:520px}\n.kol-fbar{position:fixed;left:0;right:0;bottom:0;z-index:2147483000;background:rgba(250,248,243,.97);border-top:2px solid #1f5f8b;display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;padding:4px 4px calc(4px + env(safe-area-inset-bottom));box-shadow:0 -2px 10px rgba(0,0,0,.15)}\n.kol-fbar.idle{left:auto;right:8px;bottom:8px;border:2px solid #1f5f8b;border-radius:14px;padding:2px}\n.kol-fbar.idle .kol-b:not(:last-child){display:none}\n.kol-fbar.idle .kol-fspeed,.kol-fbar.idle .kol-ftxt{display:none}\n.kol-ftxt{font-size:15px;margin:0 4px;flex:1 1 auto;min-width:0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}\n.kol-fspeed{font-size:16px;font-weight:700;direction:ltr;min-width:40px;text-align:center}\n.kol-sheet{position:fixed;left:8px;right:8px;bottom:70px;z-index:2147483001;background:#fff;border:2px solid #1f5f8b;border-radius:14px;padding:12px;max-width:560px;margin:0 auto;max-height:80vh;overflow:auto;box-shadow:0 4px 24px rgba(0,0,0,.3);font-size:17px}\n.kol-sheet h3{margin:0 0 8px;font-size:20px}\n.kol-chk{display:flex;align-items:center;gap:6px;margin:8px 0;font-size:17px;min-height:40px}\n.kol-chk input{width:24px;height:24px}\n.kol-small{font-size:14px;color:#555;margin:6px 0}\n.kol-ltr{direction:ltr;text-align:left}\n.kol-q{margin:8px 0;font-size:16px}\n.kol-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:2147483002;background:#222;color:#fff;padding:10px 16px;border-radius:12px;font-size:16px;max-width:92vw;direction:rtl;font-family:Arial,sans-serif;text-align:center}\n.kol-postbox-tools{display:flex;gap:6px;margin:6px 0}\n.kol-postbox-tools[hidden]{display:none}\nbody{padding-bottom:64px}\n.kol-fbar .kol-b{min-width:42px;padding:4px 6px;margin:2px;font-size:18px}\n.kol-fspeed{min-width:34px;font-size:15px}\n\n.kol-errbox{background:#fdecea;border:2px solid #d93025;border-radius:12px;padding:8px 10px;margin:0 0 10px;font-size:15px;color:#1d1d1d;font-family:Arial,sans-serif;text-align:left}\n.kol-errtitle{font-weight:700;color:#b3261e;margin-bottom:4px}\n.kol-errtext{white-space:pre-wrap;word-break:break-word;font-family:Menlo,monospace;font-size:12px;max-height:180px;overflow:auto;background:#fff;border-radius:8px;padding:6px;user-select:text;-webkit-user-select:text}\n.kol-diag{white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.5;background:#f6f6f6;border-radius:10px;padding:8px;margin:6px 0;text-align:left;direction:ltr;user-select:text;-webkit-user-select:text}\n\n.kol-stt-btn.on{background:#c62828;color:#fff}.kol-stt-note{margin:0 .5em}\n";(document.head||document.documentElement).appendChild(s);
+})();
+/*!
+ * ONNX Runtime Web v1.17.3
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License.
+ */
+"use strict";var ort=(()=>{var nr=Object.defineProperty;var xa=Object.getOwnPropertyDescriptor;var Pa=Object.getOwnPropertyNames;var Ra=Object.prototype.hasOwnProperty;var H=(r,t)=>()=>(r&&(t=r(r=0)),t);var ot=(r,t)=>()=>(t||r((t={exports:{}}).exports,t),t.exports),it=(r,t)=>{for(var n in t)nr(r,n,{get:t[n],enumerable:!0})},Da=(r,t,n,f)=>{if(t&&typeof t=="object"||typeof t=="function")for(let i of Pa(t))!Ra.call(r,i)&&i!==n&&nr(r,i,{get:()=>t[i],enumerable:!(f=xa(t,i))||f.enumerable});return r};var Ve=r=>Da(nr({},"__esModule",{value:!0}),r);var Ut,Xe,st,Ua,Ft,It=H(()=>{"use strict";Ut=new Map,Xe=[],st=(r,t,n)=>{if(t&&typeof t.init=="function"&&typeof t.createInferenceSessionHandler=="function"){let f=Ut.get(r);if(f===void 0)Ut.set(r,{backend:t,priority:n});else{if(f.priority>n)return;if(f.priority===n&&f.backend!==t)throw new Error(`cannot register backend "${r}" using priority ${n}`)}if(n>=0){let i=Xe.indexOf(r);i!==-1&&Xe.splice(i,1);for(let m=0;m<Xe.length;m++)if(Ut.get(Xe[m]).priority<=n){Xe.splice(m,0,r);return}Xe.push(r)}return}throw new TypeError("not a valid backend")},Ua=async r=>{let t=Ut.get(r);if(!t)return"backend not found.";if(t.initialized)return t.backend;if(t.aborted)return t.error;{let n=!!t.initPromise;try{return n||(t.initPromise=t.backend.init(r)),await t.initPromise,t.initialized=!0,t.backend}catch(f){return n||(t.error=`${f}`,t.aborted=!0),t.error}finally{delete t.initPromise}}},Ft=async r=>{let t=r.executionProviders||[],n=t.map(h=>typeof h=="string"?h:h.name),f=n.length===0?Xe:n,i,m=[],d=new Set;for(let h of f){let g=await Ua(h);typeof g=="string"?m.push({name:h,err:g}):(i||(i=g),i===g&&d.add(h))}if(!i)throw new Error(`no available backend found. ERR: ${m.map(h=>`[${h.name}] ${h.err}`).join(", ")}`);for(let{name:h,err:g}of m)n.includes(h)&&console.warn(`removing requested execution provider "${h}" from session options because it is not available: ${g}`);let s=t.filter(h=>d.has(typeof h=="string"?h:h.name));return[i,new Proxy(r,{get:(h,g)=>g==="executionProviders"?s:Reflect.get(h,g)})]}});var en=H(()=>{"use strict";It()});var tn,rn=H(()=>{"use strict";tn="1.17.3"});var nn,ve,ar=H(()=>{"use strict";rn();nn="warning",ve={wasm:{},webgl:{},webgpu:{},versions:{common:tn},set logLevel(r){if(r!==void 0){if(typeof r!="string"||["verbose","info","warning","error","fatal"].indexOf(r)===-1)throw new Error(`Unsupported logging level: ${r}`);nn=r}},get logLevel(){return nn}};Object.defineProperty(ve,"logLevel",{enumerable:!0})});var G,an=H(()=>{"use strict";ar();G=ve});var on,sn,un=H(()=>{"use strict";on=(r,t)=>{let n=typeof document<"u"?document.createElement("canvas"):new OffscreenCanvas(1,1);n.width=r.dims[3],n.height=r.dims[2];let f=n.getContext("2d");if(f!=null){let i,m;t?.tensorLayout!==void 0&&t.tensorLayout==="NHWC"?(i=r.dims[2],m=r.dims[3]):(i=r.dims[3],m=r.dims[2]);let d=t?.format!==void 0?t.format:"RGB",s=t?.norm,h,g;s===void 0||s.mean===void 0?h=[255,255,255,255]:typeof s.mean=="number"?h=[s.mean,s.mean,s.mean,s.mean]:(h=[s.mean[0],s.mean[1],s.mean[2],0],s.mean[3]!==void 0&&(h[3]=s.mean[3])),s===void 0||s.bias===void 0?g=[0,0,0,0]:typeof s.bias=="number"?g=[s.bias,s.bias,s.bias,s.bias]:(g=[s.bias[0],s.bias[1],s.bias[2],0],s.bias[3]!==void 0&&(g[3]=s.bias[3]));let O=m*i,E=0,v=O,C=O*2,x=-1;d==="RGBA"?(E=0,v=O,C=O*2,x=O*3):d==="RGB"?(E=0,v=O,C=O*2):d==="RBG"&&(E=0,C=O,v=O*2);for(let P=0;P<m;P++)for(let T=0;T<i;T++){let B=(r.data[E++]-g[0])*h[0],k=(r.data[v++]-g[1])*h[1],N=(r.data[C++]-g[2])*h[2],V=x===-1?255:(r.data[x++]-g[3])*h[3];f.fillStyle="rgba("+B+","+k+","+N+","+V+")",f.fillRect(T,P,1,1)}if("toDataURL"in n)return n.toDataURL();throw new Error("toDataURL is not supported")}else throw new Error("Can not access image data")},sn=(r,t)=>{let n=typeof document<"u"?document.createElement("canvas").getContext("2d"):new OffscreenCanvas(1,1).getContext("2d"),f;if(n!=null){let i,m,d;t?.tensorLayout!==void 0&&t.tensorLayout==="NHWC"?(i=r.dims[2],m=r.dims[1],d=r.dims[3]):(i=r.dims[3],m=r.dims[2],d=r.dims[1]);let s=t!==void 0&&t.format!==void 0?t.format:"RGB",h=t?.norm,g,O;h===void 0||h.mean===void 0?g=[255,255,255,255]:typeof h.mean=="number"?g=[h.mean,h.mean,h.mean,h.mean]:(g=[h.mean[0],h.mean[1],h.mean[2],255],h.mean[3]!==void 0&&(g[3]=h.mean[3])),h===void 0||h.bias===void 0?O=[0,0,0,0]:typeof h.bias=="number"?O=[h.bias,h.bias,h.bias,h.bias]:(O=[h.bias[0],h.bias[1],h.bias[2],0],h.bias[3]!==void 0&&(O[3]=h.bias[3]));let E=m*i;if(t!==void 0&&(t.format!==void 0&&d===4&&t.format!=="RGBA"||d===3&&t.format!=="RGB"&&t.format!=="BGR"))throw new Error("Tensor format doesn't match input tensor dims");let v=4,C=0,x=1,P=2,T=3,B=0,k=E,N=E*2,V=-1;s==="RGBA"?(B=0,k=E,N=E*2,V=E*3):s==="RGB"?(B=0,k=E,N=E*2):s==="RBG"&&(B=0,N=E,k=E*2),f=n.createImageData(i,m);for(let Y=0;Y<m*i;C+=v,x+=v,P+=v,T+=v,Y++)f.data[C]=(r.data[B++]-O[0])*g[0],f.data[x]=(r.data[k++]-O[1])*g[1],f.data[P]=(r.data[N++]-O[2])*g[2],f.data[T]=V===-1?255:(r.data[V++]-O[3])*g[3]}else throw new Error("Can not access image data");return f}});var or,fn,ln,cn,dn,pn=H(()=>{"use strict";Bt();or=(r,t)=>{if(r===void 0)throw new Error("Image buffer must be defined");if(t.height===void 0||t.width===void 0)throw new Error("Image height and width must be defined");if(t.tensorLayout==="NHWC")throw new Error("NHWC Tensor layout is not supported yet");let{height:n,width:f}=t,i=t.norm??{mean:255,bias:0},m,d;typeof i.mean=="number"?m=[i.mean,i.mean,i.mean,i.mean]:m=[i.mean[0],i.mean[1],i.mean[2],i.mean[3]??255],typeof i.bias=="number"?d=[i.bias,i.bias,i.bias,i.bias]:d=[i.bias[0],i.bias[1],i.bias[2],i.bias[3]??0];let s=t.format!==void 0?t.format:"RGBA",h=t.tensorFormat!==void 0&&t.tensorFormat!==void 0?t.tensorFormat:"RGB",g=n*f,O=h==="RGBA"?new Float32Array(g*4):new Float32Array(g*3),E=4,v=0,C=1,x=2,P=3,T=0,B=g,k=g*2,N=-1;s==="RGB"&&(E=3,v=0,C=1,x=2,P=-1),h==="RGBA"?N=g*3:h==="RBG"?(T=0,k=g,B=g*2):h==="BGR"&&(k=0,B=g,T=g*2);for(let Y=0;Y<g;Y++,v+=E,x+=E,C+=E,P+=E)O[T++]=(r[v]+d[0])/m[0],O[B++]=(r[C]+d[1])/m[1],O[k++]=(r[x]+d[2])/m[2],N!==-1&&P!==-1&&(O[N++]=(r[P]+d[3])/m[3]);return h==="RGBA"?new ge("float32",O,[1,4,n,f]):new ge("float32",O,[1,3,n,f])},fn=async(r,t)=>{let n=typeof HTMLImageElement<"u"&&r instanceof HTMLImageElement,f=typeof ImageData<"u"&&r instanceof ImageData,i=typeof ImageBitmap<"u"&&r instanceof ImageBitmap,m=typeof r=="string",d,s=t??{},h=()=>{if(typeof document<"u")return document.createElement("canvas");if(typeof OffscreenCanvas<"u")return new OffscreenCanvas(1,1);throw new Error("Canvas is not supported")},g=O=>O instanceof HTMLCanvasElement||O instanceof OffscreenCanvas?O.getContext("2d"):null;if(n){let O=h();O.width=r.width,O.height=r.height;let E=g(O);if(E!=null){let v=r.height,C=r.width;if(t!==void 0&&t.resizedHeight!==void 0&&t.resizedWidth!==void 0&&(v=t.resizedHeight,C=t.resizedWidth),t!==void 0){if(s=t,t.tensorFormat!==void 0)throw new Error("Image input config format must be RGBA for HTMLImageElement");s.tensorFormat="RGBA",s.height=v,s.width=C}else s.tensorFormat="RGBA",s.height=v,s.width=C;E.drawImage(r,0,0),d=E.getImageData(0,0,C,v).data}else throw new Error("Can not access image data")}else if(f){let O,E;if(t!==void 0&&t.resizedWidth!==void 0&&t.resizedHeight!==void 0?(O=t.resizedHeight,E=t.resizedWidth):(O=r.height,E=r.width),t!==void 0&&(s=t),s.format="RGBA",s.height=O,s.width=E,t!==void 0){let v=h();v.width=E,v.height=O;let C=g(v);if(C!=null)C.putImageData(r,0,0),d=C.getImageData(0,0,E,O).data;else throw new Error("Can not access image data")}else d=r.data}else if(i){if(t===void 0)throw new Error("Please provide image config with format for Imagebitmap");let O=h();O.width=r.width,O.height=r.height;let E=g(O);if(E!=null){let v=r.height,C=r.width;return E.drawImage(r,0,0,C,v),d=E.getImageData(0,0,C,v).data,s.height=v,s.width=C,or(d,s)}else throw new Error("Can not access image data")}else{if(m)return new Promise((O,E)=>{let v=h(),C=g(v);if(!r||!C)return E();let x=new Image;x.crossOrigin="Anonymous",x.src=r,x.onload=()=>{v.width=x.width,v.height=x.height,C.drawImage(x,0,0,v.width,v.height);let P=C.getImageData(0,0,v.width,v.height);s.height=v.height,s.width=v.width,O(or(P.data,s))}});throw new Error("Input data provided is not supported - aborted tensor creation")}if(d!==void 0)return or(d,s);throw new Error("Input data provided is not supported - aborted tensor creation")},ln=(r,t)=>{let{width:n,height:f,download:i,dispose:m}=t,d=[1,f,n,4];return new ge({location:"texture",type:"float32",texture:r,dims:d,download:i,dispose:m})},cn=(r,t)=>{let{dataType:n,dims:f,download:i,dispose:m}=t;return new ge({location:"gpu-buffer",type:n??"float32",gpuBuffer:r,dims:f,download:i,dispose:m})},dn=(r,t,n)=>new ge({location:"cpu-pinned",type:r,data:t,dims:n??[t.length]})});var Je,vt,mn,hn,gn=H(()=>{"use strict";Je=new Map([["float32",Float32Array],["uint8",Uint8Array],["int8",Int8Array],["uint16",Uint16Array],["int16",Int16Array],["int32",Int32Array],["bool",Uint8Array],["float64",Float64Array],["uint32",Uint32Array]]),vt=new Map([[Float32Array,"float32"],[Uint8Array,"uint8"],[Int8Array,"int8"],[Uint16Array,"uint16"],[Int16Array,"int16"],[Int32Array,"int32"],[Float64Array,"float64"],[Uint32Array,"uint32"]]),mn=!1,hn=()=>{if(!mn){mn=!0;let r=typeof BigInt64Array<"u"&&BigInt64Array.from,t=typeof BigUint64Array<"u"&&BigUint64Array.from,n=typeof Float16Array<"u"&&Float16Array.from;r&&(Je.set("int64",BigInt64Array),vt.set(BigInt64Array,"int64")),t&&(Je.set("uint64",BigUint64Array),vt.set(BigUint64Array,"uint64")),n?(Je.set("float16",Float16Array),vt.set(Float16Array,"float16")):Je.set("float16",Uint16Array)}}});var yn,wn,bn=H(()=>{"use strict";Bt();yn=r=>{let t=1;for(let n=0;n<r.length;n++){let f=r[n];if(typeof f!="number"||!Number.isSafeInteger(f))throw new TypeError(`dims[${n}] must be an integer, got: ${f}`);if(f<0)throw new RangeError(`dims[${n}] must be a non-negative integer, got: ${f}`);t*=f}return t},wn=(r,t)=>{switch(r.location){case"cpu":return new ge(r.type,r.data,t);case"cpu-pinned":return new ge({location:"cpu-pinned",data:r.data,type:r.type,dims:t});case"texture":return new ge({location:"texture",texture:r.texture,type:r.type,dims:t});case"gpu-buffer":return new ge({location:"gpu-buffer",gpuBuffer:r.gpuBuffer,type:r.type,dims:t});default:throw new Error(`tensorReshape: tensor location ${r.location} is not supported`)}}});var ge,Bt=H(()=>{"use strict";un();pn();gn();bn();ge=class{constructor(t,n,f){hn();let i,m;if(typeof t=="object"&&"location"in t)switch(this.dataLocation=t.location,i=t.type,m=t.dims,t.location){case"cpu-pinned":{let s=Je.get(i);if(!s)throw new TypeError(`unsupported type "${i}" to create tensor from pinned buffer`);if(!(t.data instanceof s))throw new TypeError(`buffer should be of type ${s.name}`);this.cpuData=t.data;break}case"texture":{if(i!=="float32")throw new TypeError(`unsupported type "${i}" to create tensor from texture`);this.gpuTextureData=t.texture,this.downloader=t.download,this.disposer=t.dispose;break}case"gpu-buffer":{if(i!=="float32"&&i!=="float16"&&i!=="int32"&&i!=="int64"&&i!=="uint32"&&i!=="uint8"&&i!=="bool")throw new TypeError(`unsupported type "${i}" to create tensor from gpu buffer`);this.gpuBufferData=t.gpuBuffer,this.downloader=t.download,this.disposer=t.dispose;break}default:throw new Error(`Tensor constructor: unsupported location '${this.dataLocation}'`)}else{let s,h;if(typeof t=="string")if(i=t,h=f,t==="string"){if(!Array.isArray(n))throw new TypeError("A string tensor's data must be a string array.");s=n}else{let g=Je.get(t);if(g===void 0)throw new TypeError(`Unsupported tensor type: ${t}.`);if(Array.isArray(n)){if(t==="float16"&&g===Uint16Array)throw new TypeError("Creating a float16 tensor from number array is not supported. Please use Uint16Array as data.");t==="uint64"||t==="int64"?s=g.from(n,BigInt):s=g.from(n)}else if(n instanceof g)s=n;else throw new TypeError(`A ${i} tensor's data must be type of ${g}`)}else if(h=n,Array.isArray(t)){if(t.length===0)throw new TypeError("Tensor type cannot be inferred from an empty array.");let g=typeof t[0];if(g==="string")i="string",s=t;else if(g==="boolean")i="bool",s=Uint8Array.from(t);else throw new TypeError(`Invalid element type of data array: ${g}.`)}else{let g=vt.get(t.constructor);if(g===void 0)throw new TypeError(`Unsupported type for tensor data: ${t.constructor}.`);i=g,s=t}if(h===void 0)h=[s.length];else if(!Array.isArray(h))throw new TypeError("A tensor's dims must be a number array");m=h,this.cpuData=s,this.dataLocation="cpu"}let d=yn(m);if(this.cpuData&&d!==this.cpuData.length)throw new Error(`Tensor's size(${d}) does not match data length(${this.cpuData.length}).`);this.type=i,this.dims=m,this.size=d}static async fromImage(t,n){return fn(t,n)}static fromTexture(t,n){return ln(t,n)}static fromGpuBuffer(t,n){return cn(t,n)}static fromPinnedBuffer(t,n,f){return dn(t,n,f)}toDataURL(t){return on(this,t)}toImageData(t){return sn(this,t)}get data(){if(this.ensureValid(),!this.cpuData)throw new Error("The data is not on CPU. Use `getData()` to download GPU data to CPU, or use `texture` or `gpuBuffer` property to access the GPU data directly.");return this.cpuData}get location(){return this.dataLocation}get texture(){if(this.ensureValid(),!this.gpuTextureData)throw new Error("The data is not stored as a WebGL texture.");return this.gpuTextureData}get gpuBuffer(){if(this.ensureValid(),!this.gpuBufferData)throw new Error("The data is not stored as a WebGPU buffer.");return this.gpuBufferData}async getData(t){switch(this.ensureValid(),this.dataLocation){case"cpu":case"cpu-pinned":return this.data;case"texture":case"gpu-buffer":{if(!this.downloader)throw new Error("The current tensor is not created with a specified data downloader.");if(this.isDownloading)throw new Error("The current tensor is being downloaded.");try{this.isDownloading=!0;let n=await this.downloader();return this.downloader=void 0,this.dataLocation="cpu",this.cpuData=n,t&&this.disposer&&(this.disposer(),this.disposer=void 0),n}finally{this.isDownloading=!1}}default:throw new Error(`cannot get data from location: ${this.dataLocation}`)}}dispose(){if(this.isDownloading)throw new Error("The current tensor is being downloaded.");this.disposer&&(this.disposer(),this.disposer=void 0),this.cpuData=void 0,this.gpuTextureData=void 0,this.gpuBufferData=void 0,this.downloader=void 0,this.isDownloading=void 0,this.dataLocation="none"}ensureValid(){if(this.dataLocation==="none")throw new Error("The tensor is disposed.")}reshape(t){if(this.ensureValid(),this.downloader||this.disposer)throw new Error("Cannot reshape a tensor that owns GPU resource.");return wn(this,t)}}});var ce,Lt=H(()=>{"use strict";Bt();ce=ge});var ir,vn,He,$e,sr=H(()=>{"use strict";ar();ir=(r,t)=>{(typeof ve.trace>"u"?!ve.wasm.trace:!ve.trace)||console.timeStamp(`${r}::ORT::${t}`)},vn=(r,t)=>{let n=new Error().stack?.split(/\r\n|\r|\n/g)||[],f=!1;for(let i=0;i<n.length;i++){if(f&&!n[i].includes("TRACE_FUNC")){let m=`FUNC_${r}::${n[i].trim().split(" ")[1]}`;t&&(m+=`::${t}`),ir("CPU",m);return}n[i].includes("TRACE_FUNC")&&(f=!0)}},He=r=>{(typeof ve.trace>"u"?!ve.wasm.trace:!ve.trace)||vn("BEGIN",r)},$e=r=>{(typeof ve.trace>"u"?!ve.wasm.trace:!ve.trace)||vn("END",r)}});var kt,On=H(()=>{"use strict";It();Lt();sr();kt=class r{constructor(t){this.handler=t}async run(t,n,f){He();let i={},m={};if(typeof t!="object"||t===null||t instanceof ce||Array.isArray(t))throw new TypeError("'feeds' must be an object that use input names as keys and OnnxValue as corresponding values.");let d=!0;if(typeof n=="object"){if(n===null)throw new TypeError("Unexpected argument[1]: cannot be null.");if(n instanceof ce)throw new TypeError("'fetches' cannot be a Tensor");if(Array.isArray(n)){if(n.length===0)throw new TypeError("'fetches' cannot be an empty array.");d=!1;for(let g of n){if(typeof g!="string")throw new TypeError("'fetches' must be a string array or an object.");if(this.outputNames.indexOf(g)===-1)throw new RangeError(`'fetches' contains invalid output name: ${g}.`);i[g]=null}if(typeof f=="object"&&f!==null)m=f;else if(typeof f<"u")throw new TypeError("'options' must be an object.")}else{let g=!1,O=Object.getOwnPropertyNames(n);for(let E of this.outputNames)if(O.indexOf(E)!==-1){let v=n[E];(v===null||v instanceof ce)&&(g=!0,d=!1,i[E]=v)}if(g){if(typeof f=="object"&&f!==null)m=f;else if(typeof f<"u")throw new TypeError("'options' must be an object.")}else m=n}}else if(typeof n<"u")throw new TypeError("Unexpected argument[1]: must be 'fetches' or 'options'.");for(let g of this.inputNames)if(typeof t[g]>"u")throw new Error(`input '${g}' is missing in 'feeds'.`);if(d)for(let g of this.outputNames)i[g]=null;let s=await this.handler.run(t,i,m),h={};for(let g in s)if(Object.hasOwnProperty.call(s,g)){let O=s[g];O instanceof ce?h[g]=O:h[g]=new ce(O.type,O.data,O.dims)}return $e(),h}async release(){return this.handler.dispose()}static async create(t,n,f,i){He();let m,d={};if(typeof t=="string"){if(m=t,typeof n=="object"&&n!==null)d=n;else if(typeof n<"u")throw new TypeError("'options' must be an object.")}else if(t instanceof Uint8Array){if(m=t,typeof n=="object"&&n!==null)d=n;else if(typeof n<"u")throw new TypeError("'options' must be an object.")}else if(t instanceof ArrayBuffer||typeof SharedArrayBuffer<"u"&&t instanceof SharedArrayBuffer){let O=t,E=0,v=t.byteLength;if(typeof n=="object"&&n!==null)d=n;else if(typeof n=="number"){if(E=n,!Number.isSafeInteger(E))throw new RangeError("'byteOffset' must be an integer.");if(E<0||E>=O.byteLength)throw new RangeError(`'byteOffset' is out of range [0, ${O.byteLength}).`);if(v=t.byteLength-E,typeof f=="number"){if(v=f,!Number.isSafeInteger(v))throw new RangeError("'byteLength' must be an integer.");if(v<=0||E+v>O.byteLength)throw new RangeError(`'byteLength' is out of range (0, ${O.byteLength-E}].`);if(typeof i=="object"&&i!==null)d=i;else if(typeof i<"u")throw new TypeError("'options' must be an object.")}else if(typeof f<"u")throw new TypeError("'byteLength' must be a number.")}else if(typeof n<"u")throw new TypeError("'options' must be an object.");m=new Uint8Array(O,E,v)}else throw new TypeError("Unexpected argument[0]: must be 'path' or 'buffer'.");let[s,h]=await Ft(d),g=await s.createInferenceSessionHandler(m,h);return $e(),new r(g)}startProfiling(){this.handler.startProfiling()}endProfiling(){this.handler.endProfiling()}get inputNames(){return this.handler.inputNames}get outputNames(){return this.handler.outputNames}}});var En,_n=H(()=>{"use strict";On();En=kt});var An=H(()=>{"use strict"});var Tn=H(()=>{"use strict"});var Sn=H(()=>{"use strict"});var Mn=H(()=>{"use strict"});var Fa,Nt,Cn=H(()=>{"use strict";It();Lt();Fa="Training backend could not be resolved. Make sure you're using the correct configuration & WebAssembly files.",Nt=class r{constructor(t,n,f){this.handler=t,this.hasOptimizerModel=n,this.hasEvalModel=f}get trainingInputNames(){return this.handler.inputNames}get trainingOutputNames(){return this.handler.outputNames}get evalInputNames(){if(this.hasEvalModel)return this.handler.evalInputNames;throw new Error("This training session has no evalModel loaded.")}get evalOutputNames(){if(this.hasEvalModel)return this.handler.evalOutputNames;throw new Error("This training session has no evalModel loaded.")}static async create(t,n){let f=t.evalModel||"",i=t.optimizerModel||"",m=n||{},[d,s]=await Ft(m);if(d.createTrainingSessionHandler){let h=await d.createTrainingSessionHandler(t.checkpointState,t.trainModel,f,i,s);return new r(h,!!t.optimizerModel,!!t.evalModel)}else throw new Error(Fa)}typeNarrowingForRunStep(t,n,f,i,m){let d={},s={};if(typeof f!="object"||f===null||f instanceof ce||Array.isArray(f))throw new TypeError("'feeds' must be an object that use input names as keys and OnnxValue as corresponding values.");let h=!0;if(typeof i=="object"){if(i===null)throw new TypeError("Unexpected argument[1]: cannot be null.");if(i instanceof ce)throw new TypeError("'fetches' cannot be a Tensor");if(Array.isArray(i)){if(i.length===0)throw new TypeError("'fetches' cannot be an empty array.");h=!1;for(let g of i){if(typeof g!="string")throw new TypeError("'fetches' must be a string array or an object.");if(n.indexOf(g)===-1)throw new RangeError(`'fetches' contains invalid output name: ${g}.`);d[g]=null}if(typeof m=="object"&&m!==null)s=m;else if(typeof m<"u")throw new TypeError("'options' must be an object.")}else{let g=!1,O=Object.getOwnPropertyNames(i);for(let E of n)if(O.indexOf(E)!==-1){let v=i[E];(v===null||v instanceof ce)&&(g=!0,h=!1,d[E]=v)}if(g){if(typeof m=="object"&&m!==null)s=m;else if(typeof m<"u")throw new TypeError("'options' must be an object.")}else s=i}}else if(typeof i<"u")throw new TypeError("Unexpected argument[1]: must be 'fetches' or 'options'.");for(let g of t)if(typeof f[g]>"u")throw new Error(`input '${g}' is missing in 'feeds'.`);if(h)for(let g of n)d[g]=null;return[d,s]}convertHandlerReturnTypeToMapOfTensors(t){let n={};for(let f in t)if(Object.hasOwnProperty.call(t,f)){let i=t[f];i instanceof ce?n[f]=i:n[f]=new ce(i.type,i.data,i.dims)}return n}async lazyResetGrad(){await this.handler.lazyResetGrad()}async runTrainStep(t,n,f){let[i,m]=this.typeNarrowingForRunStep(this.trainingInputNames,this.trainingOutputNames,t,n,f),d=await this.handler.runTrainStep(t,i,m);return this.convertHandlerReturnTypeToMapOfTensors(d)}async runOptimizerStep(t){if(this.hasOptimizerModel)await this.handler.runOptimizerStep(t||{});else throw new Error("This TrainingSession has no OptimizerModel loaded.")}async runEvalStep(t,n,f){if(this.hasEvalModel){let[i,m]=this.typeNarrowingForRunStep(this.evalInputNames,this.evalOutputNames,t,n,f),d=await this.handler.runEvalStep(t,i,m);return this.convertHandlerReturnTypeToMapOfTensors(d)}else throw new Error("This TrainingSession has no EvalModel loaded.")}async getParametersSize(t=!0){return this.handler.getParametersSize(t)}async loadParametersBuffer(t,n=!0){let f=await this.getParametersSize(n);if(t.length!==4*f)throw new Error("Size of the buffer passed into loadParametersBuffer must match the number of parameters in the model. Please use getParametersSize method to check.");return this.handler.loadParametersBuffer(t,n)}async getContiguousParameters(t=!0){return this.handler.getContiguousParameters(t)}async release(){return this.handler.dispose()}}});var xn,Pn=H(()=>{"use strict";Cn();xn=Nt});var ur={};it(ur,{InferenceSession:()=>En,TRACE:()=>ir,TRACE_FUNC_BEGIN:()=>He,TRACE_FUNC_END:()=>$e,Tensor:()=>ce,TrainingSession:()=>xn,env:()=>G,registerBackend:()=>st});var Qe=H(()=>{"use strict";en();an();_n();Lt();An();Tn();sr();Sn();Mn();Pn()});var fr={};it(fr,{createReadStream:()=>Dn,readFile:()=>Ia,readFileSync:()=>Ba});var Ia,Ba,Dn,lr=H(()=>{Ia=void 0,Ba=void 0,Dn=void 0});var cr={};it(cr,{join:()=>La});var La,dr=H(()=>{La=void 0});var In=ot((Fn,pr)=>{"use strict";var Un=(()=>{var r=typeof document<"u"&&document.currentScript?document.currentScript.src:void 0;return typeof __filename<"u"&&(r=r||__filename),function(t={}){var n=t,f,i;n.ready=new Promise((o,l)=>{f=o,i=l});var m=Object.assign({},n),d="./this.program",s=typeof window=="object",h=typeof importScripts=="function",g=typeof process=="object"&&typeof process.versions=="object"&&typeof process.versions.node=="string",O="",E,v,C;if(g){var x=(lr(),Ve(fr)),P=(dr(),Ve(cr));O=h?P.dirname(O)+"/":__dirname+"/",E=(o,l)=>(o=Me(o)?new URL(o):P.normalize(o),x.readFileSync(o,l?void 0:"utf8")),C=o=>(o=E(o,!0),o.buffer||(o=new Uint8Array(o)),o),v=(o,l,c,b=!0)=>{o=Me(o)?new URL(o):P.normalize(o),x.readFile(o,b?void 0:"utf8",(S,D)=>{S?c(S):l(b?D.buffer:D)})},!n.thisProgram&&1<process.argv.length&&(d=process.argv[1].replace(/\\/g,"/")),process.argv.slice(2),n.inspect=()=>"[Emscripten Module object]"}else(s||h)&&(h?O=self.location.href:typeof document<"u"&&document.currentScript&&(O=document.currentScript.src),r&&(O=r),O.indexOf("blob:")!==0?O=O.substr(0,O.replace(/[?#].*/,"").lastIndexOf("/")+1):O="",E=o=>{var l=new XMLHttpRequest;return l.open("GET",o,!1),l.send(null),l.responseText},h&&(C=o=>{var l=new XMLHttpRequest;return l.open("GET",o,!1),l.responseType="arraybuffer",l.send(null),new Uint8Array(l.response)}),v=(o,l,c)=>{var b=new XMLHttpRequest;b.open("GET",o,!0),b.responseType="arraybuffer",b.onload=()=>{b.status==200||b.status==0&&b.response?l(b.response):c()},b.onerror=c,b.send(null)});var T=console.log.bind(console),B=console.error.bind(console);Object.assign(n,m),m=null,typeof WebAssembly!="object"&&L("no native wasm support detected");var k,N=!1,V,Y,R,X,Fe;function Ne(){var o=k.buffer;n.HEAP8=V=new Int8Array(o),n.HEAP16=new Int16Array(o),n.HEAPU8=Y=new Uint8Array(o),n.HEAPU16=new Uint16Array(o),n.HEAP32=R=new Int32Array(o),n.HEAPU32=X=new Uint32Array(o),n.HEAPF32=new Float32Array(o),n.HEAPF64=Fe=new Float64Array(o)}var me=[],ie=[],re=[],Se=0,Ee=null,se=null;function L(o){throw o="Aborted("+o+")",B(o),N=!0,o=new WebAssembly.RuntimeError(o+". Build with -sASSERTIONS for more info."),i(o),o}var _e=o=>o.startsWith("data:application/octet-stream;base64,"),Me=o=>o.startsWith("file://"),de;if(de="ort-wasm.wasm",!_e(de)){var Ce=de;de=n.locateFile?n.locateFile(Ce,O):O+Ce}function J(o){if(C)return C(o);throw"both async and sync fetching of the wasm failed"}function ye(o){if(s||h){if(typeof fetch=="function"&&!Me(o))return fetch(o,{credentials:"same-origin"}).then(l=>{if(!l.ok)throw"failed to load wasm binary file at '"+o+"'";return l.arrayBuffer()}).catch(()=>J(o));if(v)return new Promise((l,c)=>{v(o,b=>l(new Uint8Array(b)),c)})}return Promise.resolve().then(()=>J(o))}function Ge(o,l,c){return ye(o).then(b=>WebAssembly.instantiate(b,l)).then(b=>b).then(c,b=>{B(`failed to asynchronously prepare wasm: ${b}`),L(b)})}function xe(o,l){var c=de;return typeof WebAssembly.instantiateStreaming!="function"||_e(c)||Me(c)||g||typeof fetch!="function"?Ge(c,o,l):fetch(c,{credentials:"same-origin"}).then(b=>WebAssembly.instantiateStreaming(b,o).then(l,function(S){return B(`wasm streaming compile failed: ${S}`),B("falling back to ArrayBuffer instantiation"),Ge(c,o,l)}))}var Ae,Te={920016:(o,l,c,b)=>{if(typeof n>"u"||!n.za)return 1;if(o=Q(o>>>0),o.startsWith("./")&&(o=o.substring(2)),o=n.za.get(o),!o)return 2;if(l>>>=0,c>>>=0,l+c>o.byteLength)return 3;try{return Y.set(o.subarray(l,l+c),b>>>0>>>0),0}catch{return 4}}};function je(o){this.xa=o-24,this.Ha=function(l){X[this.xa+4>>>2>>>0]=l},this.Ga=function(l){X[this.xa+8>>>2>>>0]=l},this.Aa=function(l,c){this.Fa(),this.Ha(l),this.Ga(c)},this.Fa=function(){X[this.xa+16>>>2>>>0]=0}}var we=0,Pe=0,Ie=typeof TextDecoder<"u"?new TextDecoder("utf8"):void 0,ae=(o,l,c)=>{l>>>=0;var b=l+c;for(c=l;o[c]&&!(c>=b);)++c;if(16<c-l&&o.buffer&&Ie)return Ie.decode(o.subarray(l,c));for(b="";l<c;){var S=o[l++];if(S&128){var D=o[l++]&63;if((S&224)==192)b+=String.fromCharCode((S&31)<<6|D);else{var W=o[l++]&63;S=(S&240)==224?(S&15)<<12|D<<6|W:(S&7)<<18|D<<12|W<<6|o[l++]&63,65536>S?b+=String.fromCharCode(S):(S-=65536,b+=String.fromCharCode(55296|S>>10,56320|S&1023))}}else b+=String.fromCharCode(S)}return b},Q=(o,l)=>(o>>>=0)?ae(Y,o,l):"",pe=o=>{for(var l=0,c=0;c<o.length;++c){var b=o.charCodeAt(c);127>=b?l++:2047>=b?l+=2:55296<=b&&57343>=b?(l+=4,++c):l+=3}return l},Be=(o,l,c,b)=>{if(c>>>=0,!(0<b))return 0;var S=c;b=c+b-1;for(var D=0;D<o.length;++D){var W=o.charCodeAt(D);if(55296<=W&&57343>=W){var oe=o.charCodeAt(++D);W=65536+((W&1023)<<10)|oe&1023}if(127>=W){if(c>=b)break;l[c++>>>0]=W}else{if(2047>=W){if(c+1>=b)break;l[c++>>>0]=192|W>>6}else{if(65535>=W){if(c+2>=b)break;l[c++>>>0]=224|W>>12}else{if(c+3>=b)break;l[c++>>>0]=240|W>>18,l[c++>>>0]=128|W>>12&63}l[c++>>>0]=128|W>>6&63}l[c++>>>0]=128|W&63}}return l[c>>>0]=0,c-S},Re=o=>o%4===0&&(o%100!==0||o%400===0),dt=[0,31,60,91,121,152,182,213,244,274,305,335],At=[0,31,59,90,120,151,181,212,243,273,304,334],Le=o=>{var l=pe(o)+1,c=St(l);return c&&Be(o,Y,c,l),c},Ke=[],We={},et=()=>{if(!tt){var o={USER:"web_user",LOGNAME:"web_user",PATH:"/",PWD:"/",HOME:"/home/web_user",LANG:(typeof navigator=="object"&&navigator.languages&&navigator.languages[0]||"C").replace("-","_")+".UTF-8",_:d||"./this.program"},l;for(l in We)We[l]===void 0?delete o[l]:o[l]=We[l];var c=[];for(l in o)c.push(`${l}=${o[l]}`);tt=c}return tt},tt,ze=[null,[],[]],pt=[31,29,31,30,31,30,31,31,30,31,30,31],mt=[31,28,31,30,31,30,31,31,30,31,30,31];function rt(o){var l=Array(pe(o)+1);return Be(o,l,0,l.length),l}function Tt(o,l,c,b){function S(y,$,q){for(y=typeof y=="number"?y.toString():y||"";y.length<$;)y=q[0]+y;return y}function D(y,$){return S(y,$,"0")}function W(y,$){function q(bt){return 0>bt?-1:0<bt?1:0}var De;return(De=q(y.getFullYear()-$.getFullYear()))===0&&(De=q(y.getMonth()-$.getMonth()))===0&&(De=q(y.getDate()-$.getDate())),De}function oe(y){switch(y.getDay()){case 0:return new Date(y.getFullYear()-1,11,29);case 1:return y;case 2:return new Date(y.getFullYear(),0,3);case 3:return new Date(y.getFullYear(),0,2);case 4:return new Date(y.getFullYear(),0,1);case 5:return new Date(y.getFullYear()-1,11,31);case 6:return new Date(y.getFullYear()-1,11,30)}}function he(y){var $=y.ta;for(y=new Date(new Date(y.ua+1900,0,1).getTime());0<$;){var q=y.getMonth(),De=(Re(y.getFullYear())?pt:mt)[q];if($>De-y.getDate())$-=De-y.getDate()+1,y.setDate(1),11>q?y.setMonth(q+1):(y.setMonth(0),y.setFullYear(y.getFullYear()+1));else{y.setDate(y.getDate()+$);break}}return q=new Date(y.getFullYear()+1,0,4),$=oe(new Date(y.getFullYear(),0,4)),q=oe(q),0>=W($,y)?0>=W(q,y)?y.getFullYear()+1:y.getFullYear():y.getFullYear()-1}o>>>=0,l>>>=0,c>>>=0,b>>>=0;var fe=X[b+40>>>2>>>0];b={Da:R[b>>>2>>>0],Ca:R[b+4>>>2>>>0],va:R[b+8>>>2>>>0],ya:R[b+12>>>2>>>0],wa:R[b+16>>>2>>>0],ua:R[b+20>>>2>>>0],oa:R[b+24>>>2>>>0],ta:R[b+28>>>2>>>0],Ia:R[b+32>>>2>>>0],Ba:R[b+36>>>2>>>0],Ea:fe?Q(fe):""},c=Q(c),fe={"%c":"%a %b %d %H:%M:%S %Y","%D":"%m/%d/%y","%F":"%Y-%m-%d","%h":"%b","%r":"%I:%M:%S %p","%R":"%H:%M","%T":"%H:%M:%S","%x":"%m/%d/%y","%X":"%H:%M:%S","%Ec":"%c","%EC":"%C","%Ex":"%m/%d/%y","%EX":"%H:%M:%S","%Ey":"%y","%EY":"%Y","%Od":"%d","%Oe":"%e","%OH":"%H","%OI":"%I","%Om":"%m","%OM":"%M","%OS":"%S","%Ou":"%u","%OU":"%U","%OV":"%V","%Ow":"%w","%OW":"%W","%Oy":"%y"};for(var le in fe)c=c.replace(new RegExp(le,"g"),fe[le]);var yt="Sunday Monday Tuesday Wednesday Thursday Friday Saturday".split(" "),wt="January February March April May June July August September October November December".split(" ");fe={"%a":y=>yt[y.oa].substring(0,3),"%A":y=>yt[y.oa],"%b":y=>wt[y.wa].substring(0,3),"%B":y=>wt[y.wa],"%C":y=>D((y.ua+1900)/100|0,2),"%d":y=>D(y.ya,2),"%e":y=>S(y.ya,2," "),"%g":y=>he(y).toString().substring(2),"%G":y=>he(y),"%H":y=>D(y.va,2),"%I":y=>(y=y.va,y==0?y=12:12<y&&(y-=12),D(y,2)),"%j":y=>{for(var $=0,q=0;q<=y.wa-1;$+=(Re(y.ua+1900)?pt:mt)[q++]);return D(y.ya+$,3)},"%m":y=>D(y.wa+1,2),"%M":y=>D(y.Ca,2),"%n":()=>`
+`,"%p":y=>0<=y.va&&12>y.va?"AM":"PM","%S":y=>D(y.Da,2),"%t":()=>"	","%u":y=>y.oa||7,"%U":y=>D(Math.floor((y.ta+7-y.oa)/7),2),"%V":y=>{var $=Math.floor((y.ta+7-(y.oa+6)%7)/7);if(2>=(y.oa+371-y.ta-2)%7&&$++,$)$==53&&(q=(y.oa+371-y.ta)%7,q==4||q==3&&Re(y.ua)||($=1));else{$=52;var q=(y.oa+7-y.ta-1)%7;(q==4||q==5&&Re(y.ua%400-1))&&$++}return D($,2)},"%w":y=>y.oa,"%W":y=>D(Math.floor((y.ta+7-(y.oa+6)%7)/7),2),"%y":y=>(y.ua+1900).toString().substring(2),"%Y":y=>y.ua+1900,"%z":y=>{y=y.Ba;var $=0<=y;return y=Math.abs(y)/60,($?"+":"-")+("0000"+(y/60*100+y%60)).slice(-4)},"%Z":y=>y.Ea,"%%":()=>"%"},c=c.replace(/%%/g,"\0\0");for(le in fe)c.includes(le)&&(c=c.replace(new RegExp(le,"g"),fe[le](b)));return c=c.replace(/\0\0/g,"%"),le=rt(c),le.length>l?0:(V.set(le,o>>>0),le.length-1)}var z={a:function(o,l,c){throw o>>>=0,new je(o).Aa(l>>>0,c>>>0),we=o,Pe++,we},e:function(){return 0},H:function(){},x:function(){},z:function(){},J:function(){return 0},F:function(){},A:function(){},E:function(){},g:function(){},y:function(){},v:function(){},G:function(){},w:function(){},k:()=>1,n:function(o,l,c){o=l+2097152>>>0<4194305-!!o?(o>>>0)+4294967296*l:NaN,c>>>=0,o=new Date(1e3*o),R[c>>>2>>>0]=o.getUTCSeconds(),R[c+4>>>2>>>0]=o.getUTCMinutes(),R[c+8>>>2>>>0]=o.getUTCHours(),R[c+12>>>2>>>0]=o.getUTCDate(),R[c+16>>>2>>>0]=o.getUTCMonth(),R[c+20>>>2>>>0]=o.getUTCFullYear()-1900,R[c+24>>>2>>>0]=o.getUTCDay(),R[c+28>>>2>>>0]=(o.getTime()-Date.UTC(o.getUTCFullYear(),0,1,0,0,0,0))/864e5|0},o:function(o,l,c){o=l+2097152>>>0<4194305-!!o?(o>>>0)+4294967296*l:NaN,c>>>=0,o=new Date(1e3*o),R[c>>>2>>>0]=o.getSeconds(),R[c+4>>>2>>>0]=o.getMinutes(),R[c+8>>>2>>>0]=o.getHours(),R[c+12>>>2>>>0]=o.getDate(),R[c+16>>>2>>>0]=o.getMonth(),R[c+20>>>2>>>0]=o.getFullYear()-1900,R[c+24>>>2>>>0]=o.getDay(),R[c+28>>>2>>>0]=(Re(o.getFullYear())?dt:At)[o.getMonth()]+o.getDate()-1|0,R[c+36>>>2>>>0]=-(60*o.getTimezoneOffset()),l=new Date(o.getFullYear(),6,1).getTimezoneOffset();var b=new Date(o.getFullYear(),0,1).getTimezoneOffset();R[c+32>>>2>>>0]=(l!=b&&o.getTimezoneOffset()==Math.min(b,l))|0},p:function(o){o>>>=0;var l=new Date(R[o+20>>>2>>>0]+1900,R[o+16>>>2>>>0],R[o+12>>>2>>>0],R[o+8>>>2>>>0],R[o+4>>>2>>>0],R[o>>>2>>>0],0),c=R[o+32>>>2>>>0],b=l.getTimezoneOffset(),S=new Date(l.getFullYear(),6,1).getTimezoneOffset(),D=new Date(l.getFullYear(),0,1).getTimezoneOffset(),W=Math.min(D,S);return 0>c?R[o+32>>>2>>>0]=+(S!=D&&W==b):0<c!=(W==b)&&(S=Math.max(D,S),l.setTime(l.getTime()+6e4*((0<c?W:S)-b))),R[o+24>>>2>>>0]=l.getDay(),R[o+28>>>2>>>0]=(Re(l.getFullYear())?dt:At)[l.getMonth()]+l.getDate()-1|0,R[o>>>2>>>0]=l.getSeconds(),R[o+4>>>2>>>0]=l.getMinutes(),R[o+8>>>2>>>0]=l.getHours(),R[o+12>>>2>>>0]=l.getDate(),R[o+16>>>2>>>0]=l.getMonth(),R[o+20>>>2>>>0]=l.getYear(),o=l.getTime(),isNaN(o)?(R[nt()>>>2>>>0]=61,o=-1):o/=1e3,ht((Ae=o,1<=+Math.abs(Ae)?0<Ae?+Math.floor(Ae/4294967296)>>>0:~~+Math.ceil((Ae-+(~~Ae>>>0))/4294967296)>>>0:0)),o>>>0},l:function(){return-52},m:function(){},t:function(o,l,c){function b(he){return(he=he.toTimeString().match(/\(([A-Za-z ]+)\)$/))?he[1]:"GMT"}c>>>=0;var S=new Date().getFullYear(),D=new Date(S,0,1),W=new Date(S,6,1);S=D.getTimezoneOffset();var oe=W.getTimezoneOffset();X[o>>>0>>>2>>>0]=60*Math.max(S,oe),R[l>>>0>>>2>>>0]=+(S!=oe),o=b(D),l=b(W),o=Le(o),l=Le(l),oe<S?(X[c>>>2>>>0]=o,X[c+4>>>2>>>0]=l):(X[c>>>2>>>0]=l,X[c+4>>>2>>>0]=o)},d:()=>{L("")},B:function(o,l,c){o>>>=0,l>>>=0,c>>>=0,Ke.length=0;for(var b;b=Y[l++>>>0];){var S=b!=105;S&=b!=112,c+=S&&c%8?4:0,Ke.push(b==112?X[c>>>2>>>0]:b==105?R[c>>>2>>>0]:Fe[c>>>3>>>0]),c+=S?8:4}return Te[o].apply(null,Ke)},h:()=>Date.now(),u:function(){return 4294901760},b:()=>performance.now(),I:function(o,l,c){return l>>>=0,Y.copyWithin(o>>>0>>>0,l>>>0,l+(c>>>0)>>>0)},s:function(o){o>>>=0;var l=Y.length;if(4294901760<o)return!1;for(var c=1;4>=c;c*=2){var b=l*(1+.2/c);b=Math.min(b,o+100663296);var S=Math;b=Math.max(o,b);e:{S=(S.min.call(S,4294901760,b+(65536-b%65536)%65536)-k.buffer.byteLength+65535)/65536;try{k.grow(S),Ne();var D=1;break e}catch{}D=void 0}if(D)return!0}return!1},C:function(o,l){o>>>=0,l>>>=0;var c=0;return et().forEach((b,S)=>{var D=l+c;for(S=X[o+4*S>>>2>>>0]=D,D=0;D<b.length;++D)V[S++>>>0>>>0]=b.charCodeAt(D);V[S>>>0>>>0]=0,c+=b.length+1}),0},D:function(o,l){o>>>=0,l>>>=0;var c=et();X[o>>>2>>>0]=c.length;var b=0;return c.forEach(S=>b+=S.length+1),X[l>>>2>>>0]=b,0},f:()=>52,j:function(){return 52},q:function(){return 70},i:function(o,l,c,b){l>>>=0,c>>>=0,b>>>=0;for(var S=0,D=0;D<c;D++){var W=X[l>>>2>>>0],oe=X[l+4>>>2>>>0];l+=8;for(var he=0;he<oe;he++){var fe=Y[W+he>>>0],le=ze[o];fe===0||fe===10?((o===1?T:B)(ae(le,0)),le.length=0):le.push(fe)}S+=oe}return X[b>>>2>>>0]=S,0},r:Tt,c:function(o,l,c,b){return Tt(o>>>0,l>>>0,c>>>0,b>>>0)}},I=function(){function o(c){return I=c.exports,I=Ct(),k=I.K,Ne(),ie.unshift(I.L),Se--,Se==0&&(Ee!==null&&(clearInterval(Ee),Ee=null),se&&(c=se,se=null,c())),I}var l={a:z};if(Se++,n.instantiateWasm)try{return n.instantiateWasm(l,o)}catch(c){B(`Module.instantiateWasm callback failed with error: ${c}`),i(c)}return xe(l,function(c){o(c.instance)}).catch(i),{}}();n._OrtInit=(o,l)=>(n._OrtInit=I.M)(o,l),n._OrtGetLastError=(o,l)=>(n._OrtGetLastError=I.N)(o,l),n._OrtCreateSessionOptions=(o,l,c,b,S,D,W,oe,he,fe)=>(n._OrtCreateSessionOptions=I.O)(o,l,c,b,S,D,W,oe,he,fe),n._OrtAppendExecutionProvider=(o,l)=>(n._OrtAppendExecutionProvider=I.P)(o,l),n._OrtAddFreeDimensionOverride=(o,l,c)=>(n._OrtAddFreeDimensionOverride=I.Q)(o,l,c),n._OrtAddSessionConfigEntry=(o,l,c)=>(n._OrtAddSessionConfigEntry=I.R)(o,l,c),n._OrtReleaseSessionOptions=o=>(n._OrtReleaseSessionOptions=I.S)(o),n._OrtCreateSession=(o,l,c)=>(n._OrtCreateSession=I.T)(o,l,c),n._OrtReleaseSession=o=>(n._OrtReleaseSession=I.U)(o),n._OrtGetInputOutputCount=(o,l,c)=>(n._OrtGetInputOutputCount=I.V)(o,l,c),n._OrtGetInputName=(o,l)=>(n._OrtGetInputName=I.W)(o,l),n._OrtGetOutputName=(o,l)=>(n._OrtGetOutputName=I.X)(o,l),n._OrtFree=o=>(n._OrtFree=I.Y)(o),n._OrtCreateTensor=(o,l,c,b,S,D)=>(n._OrtCreateTensor=I.Z)(o,l,c,b,S,D),n._OrtGetTensorData=(o,l,c,b,S)=>(n._OrtGetTensorData=I._)(o,l,c,b,S),n._OrtReleaseTensor=o=>(n._OrtReleaseTensor=I.$)(o),n._OrtCreateRunOptions=(o,l,c,b)=>(n._OrtCreateRunOptions=I.aa)(o,l,c,b),n._OrtAddRunConfigEntry=(o,l,c)=>(n._OrtAddRunConfigEntry=I.ba)(o,l,c),n._OrtReleaseRunOptions=o=>(n._OrtReleaseRunOptions=I.ca)(o),n._OrtCreateBinding=o=>(n._OrtCreateBinding=I.da)(o),n._OrtBindInput=(o,l,c)=>(n._OrtBindInput=I.ea)(o,l,c),n._OrtBindOutput=(o,l,c,b)=>(n._OrtBindOutput=I.fa)(o,l,c,b),n._OrtClearBoundOutputs=o=>(n._OrtClearBoundOutputs=I.ga)(o),n._OrtReleaseBinding=o=>(n._OrtReleaseBinding=I.ha)(o),n._OrtRunWithBinding=(o,l,c,b,S)=>(n._OrtRunWithBinding=I.ia)(o,l,c,b,S),n._OrtRun=(o,l,c,b,S,D,W,oe)=>(n._OrtRun=I.ja)(o,l,c,b,S,D,W,oe),n._OrtEndProfiling=o=>(n._OrtEndProfiling=I.ka)(o);var nt=()=>(nt=I.la)(),St=n._malloc=o=>(St=n._malloc=I.ma)(o);n._free=o=>(n._free=I.na)(o);var ht=o=>(ht=I.pa)(o),Mt=()=>(Mt=I.qa)(),F=o=>(F=I.ra)(o),Ye=o=>(Ye=I.sa)(o);function Ct(){var o=I;o=Object.assign({},o);var l=b=>()=>b()>>>0,c=b=>S=>b(S)>>>0;return o.la=l(o.la),o.ma=c(o.ma),o.qa=l(o.qa),o.sa=c(o.sa),o}n.stackAlloc=Ye,n.stackSave=Mt,n.stackRestore=F,n.UTF8ToString=Q,n.stringToUTF8=(o,l,c)=>Be(o,Y,l,c),n.lengthBytesUTF8=pe;var ke;se=function o(){ke||gt(),ke||(se=o)};function gt(){if(!(0<Se)){if(n.preRun)for(typeof n.preRun=="function"&&(n.preRun=[n.preRun]);n.preRun.length;){var o=n.preRun.shift();me.unshift(o)}for(;0<me.length;)me.shift()(n);if(!(0<Se||ke||(ke=!0,n.calledRun=!0,N))){for(;0<ie.length;)ie.shift()(n);for(f(n);0<re.length;)re.shift()(n)}}}return gt(),t.ready}})();typeof Fn=="object"&&typeof pr=="object"?pr.exports=Un:typeof define=="function"&&define.amd&&define([],()=>Un)});var Bn=ot(()=>{});var Ln=ot(()=>{});var kn={};it(kn,{cpus:()=>ka});var ka,Nn=H(()=>{ka=void 0});var $n=ot((Hn,mr)=>{"use strict";var Wn=(()=>{var r=typeof document<"u"&&document.currentScript?document.currentScript.src:void 0;return typeof __filename<"u"&&(r=r||__filename),function(t={}){function n(){return re.buffer!=L.buffer&&J(),L}function f(){return re.buffer!=L.buffer&&J(),_e}function i(){return re.buffer!=L.buffer&&J(),Me}function m(){return re.buffer!=L.buffer&&J(),de}function d(){return re.buffer!=L.buffer&&J(),Ce}var s=t,h,g;s.ready=new Promise((e,a)=>{h=e,g=a});var O=Object.assign({},s),E="./this.program",v=(e,a)=>{throw a},C=typeof window=="object",x=typeof importScripts=="function",P=typeof process=="object"&&typeof process.versions=="object"&&typeof process.versions.node=="string",T=s.ENVIRONMENT_IS_PTHREAD||!1,B="";function k(e){return s.locateFile?s.locateFile(e,B):B+e}var N,V,Y;if(P){var R=(lr(),Ve(fr)),X=(dr(),Ve(cr));B=x?X.dirname(B)+"/":__dirname+"/",N=(a,u)=>(a=Q(a)?new URL(a):X.normalize(a),R.readFileSync(a,u?void 0:"utf8")),Y=a=>(a=N(a,!0),a.buffer||(a=new Uint8Array(a)),a),V=(a,u,p,_=!0)=>{a=Q(a)?new URL(a):X.normalize(a),R.readFile(a,_?void 0:"utf8",(A,M)=>{A?p(A):u(_?M.buffer:M)})},!s.thisProgram&&1<process.argv.length&&(E=process.argv[1].replace(/\\/g,"/")),process.argv.slice(2),v=(a,u)=>{throw process.exitCode=a,u},s.inspect=()=>"[Emscripten Module object]";let e;try{e=Bn()}catch(a){throw console.error('The "worker_threads" module is not supported in this node.js build - perhaps a newer version is needed?'),a}global.Worker=e.Worker}else(C||x)&&(x?B=self.location.href:typeof document<"u"&&document.currentScript&&(B=document.currentScript.src),typeof r<"u"&&r&&(B=r),B.indexOf("blob:")!==0?B=B.substr(0,B.replace(/[?#].*/,"").lastIndexOf("/")+1):B="",P||(N=e=>{var a=new XMLHttpRequest;return a.open("GET",e,!1),a.send(null),a.responseText},x&&(Y=e=>{var a=new XMLHttpRequest;return a.open("GET",e,!1),a.responseType="arraybuffer",a.send(null),new Uint8Array(a.response)}),V=(e,a,u)=>{var p=new XMLHttpRequest;p.open("GET",e,!0),p.responseType="arraybuffer",p.onload=()=>{p.status==200||p.status==0&&p.response?a(p.response):u()},p.onerror=u,p.send(null)}));P&&typeof performance>"u"&&(global.performance=Ln().performance);var Fe=console.log.bind(console),Ne=console.error.bind(console);P&&(Fe=(...e)=>R.writeSync(1,e.join(" ")+`
+`),Ne=(...e)=>R.writeSync(2,e.join(" ")+`
+`));var me=Fe,ie=Ne;Object.assign(s,O),O=null,typeof WebAssembly!="object"&&Ie("no native wasm support detected");var re,Se,Ee=!1,se,L,_e,Me,de,Ce;function J(){var e=re.buffer;s.HEAP8=L=new Int8Array(e),s.HEAP16=new Int16Array(e),s.HEAPU8=_e=new Uint8Array(e),s.HEAPU16=new Uint16Array(e),s.HEAP32=Me=new Int32Array(e),s.HEAPU32=de=new Uint32Array(e),s.HEAPF32=new Float32Array(e),s.HEAPF64=Ce=new Float64Array(e)}var ye=16777216;if(T)re=s.wasmMemory;else if(s.wasmMemory)re=s.wasmMemory;else if(re=new WebAssembly.Memory({initial:ye/65536,maximum:65536,shared:!0}),!(re.buffer instanceof SharedArrayBuffer))throw ie("requested a shared WebAssembly.Memory but the returned buffer is not a SharedArrayBuffer, indicating that while the browser has SharedArrayBuffer it does not have WebAssembly threads support - you may need to set a flag"),P&&ie("(on node you may need: --experimental-wasm-threads --experimental-wasm-bulk-memory and/or recent version)"),Error("bad memory");J(),ye=re.buffer.byteLength;var Ge=[],xe=[],Ae=[],Te=0,je=null,we=null;function Pe(){if(Te--,Te==0&&(je!==null&&(clearInterval(je),je=null),we)){var e=we;we=null,e()}}function Ie(e){throw e="Aborted("+e+")",ie(e),Ee=!0,se=1,e=new WebAssembly.RuntimeError(e+". Build with -sASSERTIONS for more info."),g(e),e}var ae=e=>e.startsWith("data:application/octet-stream;base64,"),Q=e=>e.startsWith("file://"),pe;pe="ort-wasm-threaded.wasm",ae(pe)||(pe=k(pe));function Be(e){if(Y)return Y(e);throw"both async and sync fetching of the wasm failed"}function Re(e){if(C||x){if(typeof fetch=="function"&&!Q(e))return fetch(e,{credentials:"same-origin"}).then(a=>{if(!a.ok)throw"failed to load wasm binary file at '"+e+"'";return a.arrayBuffer()}).catch(()=>Be(e));if(V)return new Promise((a,u)=>{V(e,p=>a(new Uint8Array(p)),u)})}return Promise.resolve().then(()=>Be(e))}function dt(e,a,u){return Re(e).then(p=>WebAssembly.instantiate(p,a)).then(p=>p).then(u,p=>{ie(`failed to asynchronously prepare wasm: ${p}`),Ie(p)})}function At(e,a){var u=pe;return typeof WebAssembly.instantiateStreaming!="function"||ae(u)||Q(u)||P||typeof fetch!="function"?dt(u,e,a):fetch(u,{credentials:"same-origin"}).then(p=>WebAssembly.instantiateStreaming(p,e).then(a,function(_){return ie(`wasm streaming compile failed: ${_}`),ie("falling back to ArrayBuffer instantiation"),dt(u,e,a)}))}var Le,Ke={921388:(e,a,u,p)=>{if(typeof s>"u"||!s.cb)return 1;if(e=rt(e>>>0),e.startsWith("./")&&(e=e.substring(2)),e=s.cb.get(e),!e)return 2;if(a>>>=0,u>>>=0,p>>>=0,a+u>e.byteLength)return 3;try{return f().set(e.subarray(a,a+u),p>>>0),0}catch{return 4}}};function We(e){this.name="ExitStatus",this.message=`Program terminated with exit(${e})`,this.status=e}var et=e=>{e.terminate(),e.onmessage=()=>{}},tt=e=>{F.Pa.length==0&&(ht(),F.Ya(F.Pa[0]));var a=F.Pa.pop();if(!a)return 6;F.Qa.push(a),F.Ma[e.Oa]=a,a.Oa=e.Oa;var u={cmd:"run",start_routine:e.kb,arg:e.hb,pthread_ptr:e.Oa};return P&&a.unref(),a.postMessage(u,e.qb),0},ze=0,pt=typeof TextDecoder<"u"?new TextDecoder("utf8"):void 0,mt=(e,a,u)=>{a>>>=0;var p=a+u;for(u=a;e[u]&&!(u>=p);)++u;if(16<u-a&&e.buffer&&pt)return pt.decode(e.buffer instanceof SharedArrayBuffer?e.slice(a,u):e.subarray(a,u));for(p="";a<u;){var _=e[a++];if(_&128){var A=e[a++]&63;if((_&224)==192)p+=String.fromCharCode((_&31)<<6|A);else{var M=e[a++]&63;_=(_&240)==224?(_&15)<<12|A<<6|M:(_&7)<<18|A<<12|M<<6|e[a++]&63,65536>_?p+=String.fromCharCode(_):(_-=65536,p+=String.fromCharCode(55296|_>>10,56320|_&1023))}}else p+=String.fromCharCode(_)}return p},rt=(e,a)=>(e>>>=0)?mt(f(),e,a):"",Tt=e=>{var a=tr();return e=e(),Rt(a),e};function z(e,a){var u=arguments.length-2,p=arguments;return Tt(()=>{for(var _=rr(8*u),A=_>>>3,M=0;M<u;M++){var ee=p[2+M];d()[A+M>>>0]=ee}return Yr(e,u,_,a)})}function I(e){if(T)return z(0,1,e);se=e,0<ze||(F.lb(),s.onExit?.(e),Ee=!0),v(e,new We(e))}var nt=e=>{if(se=e,T)throw Ct(e),"unwind";I(e)};function St(){for(var e=s.numThreads;e--;)ht();Ge.unshift(()=>{Te++,Mt(()=>Pe())})}function ht(){var e=k("ort-wasm-threaded.worker.js");e=new Worker(e),F.Pa.push(e)}function Mt(e){T?e():Promise.all(F.Pa.map(F.Ya)).then(e)}var F={Pa:[],Qa:[],bb:[],Ma:{},Wa(){T?(F.receiveObjectTransfer=F.jb,F.threadInitTLS=F.ab,F.setExitStatus=F.$a):St()},$a:e=>se=e,tb:["$terminateWorker"],lb:()=>{for(var e of F.Qa)et(e);for(e of F.Pa)et(e);F.Pa=[],F.Qa=[],F.Ma=[]},Za:e=>{var a=e.Oa;delete F.Ma[a],F.Pa.push(e),F.Qa.splice(F.Qa.indexOf(e),1),e.Oa=0,Kt(a)},jb(){},ab(){F.bb.forEach(e=>e())},Ya:e=>new Promise(a=>{e.onmessage=A=>{A=A.data;var M=A.cmd;if(A.targetThread&&A.targetThread!=Pt()){var ee=F.Ma[A.targetThread];ee?ee.postMessage(A,A.transferList):ie(`Internal error! Worker sent a message "${M}" to target pthread ${A.targetThread}, but that thread no longer exists!`)}else M==="checkMailbox"?xt():M==="spawnThread"?tt(A):M==="cleanupThread"?F.Za(F.Ma[A.thread]):M==="killThread"?(A=A.thread,M=F.Ma[A],delete F.Ma[A],et(M),Kt(A),F.Qa.splice(F.Qa.indexOf(M),1),M.Oa=0):M==="cancelThread"?F.Ma[A.thread].postMessage({cmd:"cancel"}):M==="loaded"?(e.loaded=!0,P&&!e.Oa&&e.unref(),a(e)):M==="alert"?alert(`Thread ${A.threadId}: ${A.text}`):A.target==="setimmediate"?e.postMessage(A):M==="callHandler"?s[A.handler](...A.args):M&&ie(`worker sent an unknown command ${M}`)},e.onerror=A=>{throw ie(`worker sent an error! ${A.filename}:${A.lineno}: ${A.message}`),A},P&&(e.on("message",A=>e.onmessage({data:A})),e.on("error",A=>e.onerror(A)));var u=[],p=["onExit"],_;for(_ of p)s.hasOwnProperty(_)&&u.push(_);e.postMessage({cmd:"load",handlers:u,urlOrBlob:s.mainScriptUrlOrBlob||r,wasmMemory:re,wasmModule:Se})})};s.PThread=F;var Ye=e=>{for(;0<e.length;)e.shift()(s)};s.establishStackSpace=()=>{var e=Pt(),a=m()[e+52>>>2>>>0];e=m()[e+56>>>2>>>0],Xr(a,a-e),Rt(a)};function Ct(e){if(T)return z(1,0,e);nt(e)}var ke=[],gt;s.invokeEntryPoint=(e,a)=>{var u=ke[e];u||(e>=ke.length&&(ke.length=e+1),ke[e]=u=gt.get(e)),e=u(a),0<ze?F.$a(e):er(e)};function o(e){this.Va=e-24,this.gb=function(a){m()[this.Va+4>>>2>>>0]=a},this.fb=function(a){m()[this.Va+8>>>2>>>0]=a},this.Wa=function(a,u){this.eb(),this.gb(a),this.fb(u)},this.eb=function(){m()[this.Va+16>>>2>>>0]=0}}var l=0,c=0;function b(e,a,u,p){return T?z(2,1,e,a,u,p):S(e,a,u,p)}function S(e,a,u,p){if(e>>>=0,a>>>=0,u>>>=0,p>>>=0,typeof SharedArrayBuffer>"u")return ie("Current environment does not support SharedArrayBuffer, pthreads are not available!"),6;var _=[];return T&&_.length===0?b(e,a,u,p):(e={kb:u,Oa:e,hb:p,qb:_},T?(e.sb="spawnThread",postMessage(e,_),0):tt(e))}function D(e,a,u){return T?z(3,1,e,a,u):0}function W(e,a){if(T)return z(4,1,e,a)}var oe=e=>{for(var a=0,u=0;u<e.length;++u){var p=e.charCodeAt(u);127>=p?a++:2047>=p?a+=2:55296<=p&&57343>=p?(a+=4,++u):a+=3}return a},he=(e,a,u,p)=>{if(u>>>=0,!(0<p))return 0;var _=u;p=u+p-1;for(var A=0;A<e.length;++A){var M=e.charCodeAt(A);if(55296<=M&&57343>=M){var ee=e.charCodeAt(++A);M=65536+((M&1023)<<10)|ee&1023}if(127>=M){if(u>=p)break;a[u++>>>0]=M}else{if(2047>=M){if(u+1>=p)break;a[u++>>>0]=192|M>>6}else{if(65535>=M){if(u+2>=p)break;a[u++>>>0]=224|M>>12}else{if(u+3>=p)break;a[u++>>>0]=240|M>>18,a[u++>>>0]=128|M>>12&63}a[u++>>>0]=128|M>>6&63}a[u++>>>0]=128|M&63}}return a[u>>>0]=0,u-_},fe=(e,a,u)=>he(e,f(),a,u);function le(e,a){if(T)return z(5,1,e,a)}function yt(e,a,u){if(T)return z(6,1,e,a,u)}function wt(e,a,u){return T?z(7,1,e,a,u):0}function y(e,a){if(T)return z(8,1,e,a)}function $(e,a,u){if(T)return z(9,1,e,a,u)}function q(e,a,u,p){if(T)return z(10,1,e,a,u,p)}function De(e,a,u,p){if(T)return z(11,1,e,a,u,p)}function bt(e,a,u,p){if(T)return z(12,1,e,a,u,p)}function Tr(e){if(T)return z(13,1,e)}function Sr(e,a){if(T)return z(14,1,e,a)}function Mr(e,a,u){if(T)return z(15,1,e,a,u)}function Vt(e){e>>>=0,typeof Atomics.rb=="function"&&(Atomics.rb(i(),e>>>2,e).value.then(xt),e+=128,Atomics.store(i(),e>>>2,1))}s.__emscripten_thread_mailbox_await=Vt;var xt=()=>{var e=Pt();if(e&&(Vt(e),e=qr,!Ee))try{if(e(),!(0<ze))try{T?er(se):nt(se)}catch(a){a instanceof We||a=="unwind"||v(1,a)}}catch(a){a instanceof We||a=="unwind"||v(1,a)}};s.checkMailbox=xt;var Xt=[],at=e=>e%4===0&&(e%100!==0||e%400===0),Cr=[0,31,60,91,121,152,182,213,244,274,305,335],xr=[0,31,59,90,120,151,181,212,243,273,304,334];function Pr(e,a,u,p,_,A,M,ee){return T?z(16,1,e,a,u,p,_,A,M,ee):-52}function Rr(e,a,u,p,_,A,M){if(T)return z(17,1,e,a,u,p,_,A,M)}var Dr=e=>{var a=oe(e)+1,u=jr(a);return u&&fe(e,u,a),u},Jt=[],Qt={},Ur=()=>{if(!Zt){var e={USER:"web_user",LOGNAME:"web_user",PATH:"/",PWD:"/",HOME:"/home/web_user",LANG:(typeof navigator=="object"&&navigator.languages&&navigator.languages[0]||"C").replace("-","_")+".UTF-8",_:E||"./this.program"},a;for(a in Qt)Qt[a]===void 0?delete e[a]:e[a]=Qt[a];var u=[];for(a in e)u.push(`${a}=${e[a]}`);Zt=u}return Zt},Zt;function Fr(e,a){if(T)return z(18,1,e,a);e>>>=0,a>>>=0;var u=0;return Ur().forEach((p,_)=>{var A=a+u;for(_=m()[e+4*_>>>2>>>0]=A,A=0;A<p.length;++A)n()[_++>>>0>>>0]=p.charCodeAt(A);n()[_>>>0>>>0]=0,u+=p.length+1}),0}function Ir(e,a){if(T)return z(19,1,e,a);e>>>=0,a>>>=0;var u=Ur();m()[e>>>2>>>0]=u.length;var p=0;return u.forEach(_=>p+=_.length+1),m()[a>>>2>>>0]=p,0}function Br(e){return T?z(20,1,e):52}function Lr(e,a,u,p){return T?z(21,1,e,a,u,p):52}function kr(e,a,u,p,_){return T?z(22,1,e,a,u,p,_):70}var _a=[null,[],[]];function Nr(e,a,u,p){if(T)return z(23,1,e,a,u,p);a>>>=0,u>>>=0,p>>>=0;for(var _=0,A=0;A<u;A++){var M=m()[a>>>2>>>0],ee=m()[a+4>>>2>>>0];a+=8;for(var Ue=0;Ue<ee;Ue++){var ue=f()[M+Ue>>>0],be=_a[e];ue===0||ue===10?((e===1?me:ie)(mt(be,0)),be.length=0):be.push(ue)}_+=ee}return m()[p>>>2>>>0]=_,0}var Wr=[31,29,31,30,31,30,31,31,30,31,30,31],Hr=[31,28,31,30,31,30,31,31,30,31,30,31];function Aa(e){var a=Array(oe(e)+1);return he(e,a,0,a.length),a}var Ta=(e,a)=>{n().set(e,a>>>0)};function $r(e,a,u,p){function _(w,j,te){for(w=typeof w=="number"?w.toString():w||"";w.length<j;)w=te[0]+w;return w}function A(w,j){return _(w,j,"0")}function M(w,j){function te(Kr){return 0>Kr?-1:0<Kr?1:0}var qe;return(qe=te(w.getFullYear()-j.getFullYear()))===0&&(qe=te(w.getMonth()-j.getMonth()))===0&&(qe=te(w.getDate()-j.getDate())),qe}function ee(w){switch(w.getDay()){case 0:return new Date(w.getFullYear()-1,11,29);case 1:return w;case 2:return new Date(w.getFullYear(),0,3);case 3:return new Date(w.getFullYear(),0,2);case 4:return new Date(w.getFullYear(),0,1);case 5:return new Date(w.getFullYear()-1,11,31);case 6:return new Date(w.getFullYear()-1,11,30)}}function Ue(w){var j=w.Ra;for(w=new Date(new Date(w.Sa+1900,0,1).getTime());0<j;){var te=w.getMonth(),qe=(at(w.getFullYear())?Wr:Hr)[te];if(j>qe-w.getDate())j-=qe-w.getDate()+1,w.setDate(1),11>te?w.setMonth(te+1):(w.setMonth(0),w.setFullYear(w.getFullYear()+1));else{w.setDate(w.getDate()+j);break}}return te=new Date(w.getFullYear()+1,0,4),j=ee(new Date(w.getFullYear(),0,4)),te=ee(te),0>=M(j,w)?0>=M(te,w)?w.getFullYear()+1:w.getFullYear():w.getFullYear()-1}e>>>=0,a>>>=0,u>>>=0,p>>>=0;var ue=m()[p+40>>>2>>>0];p={ob:i()[p>>>2>>>0],nb:i()[p+4>>>2>>>0],Ta:i()[p+8>>>2>>>0],Xa:i()[p+12>>>2>>>0],Ua:i()[p+16>>>2>>>0],Sa:i()[p+20>>>2>>>0],Na:i()[p+24>>>2>>>0],Ra:i()[p+28>>>2>>>0],ub:i()[p+32>>>2>>>0],mb:i()[p+36>>>2>>>0],pb:ue?rt(ue):""},u=rt(u),ue={"%c":"%a %b %d %H:%M:%S %Y","%D":"%m/%d/%y","%F":"%Y-%m-%d","%h":"%b","%r":"%I:%M:%S %p","%R":"%H:%M","%T":"%H:%M:%S","%x":"%m/%d/%y","%X":"%H:%M:%S","%Ec":"%c","%EC":"%C","%Ex":"%m/%d/%y","%EX":"%H:%M:%S","%Ey":"%y","%EY":"%Y","%Od":"%d","%Oe":"%e","%OH":"%H","%OI":"%I","%Om":"%m","%OM":"%M","%OS":"%S","%Ou":"%u","%OU":"%U","%OV":"%V","%Ow":"%w","%OW":"%W","%Oy":"%y"};for(var be in ue)u=u.replace(new RegExp(be,"g"),ue[be]);var Qr="Sunday Monday Tuesday Wednesday Thursday Friday Saturday".split(" "),Zr="January February March April May June July August September October November December".split(" ");ue={"%a":w=>Qr[w.Na].substring(0,3),"%A":w=>Qr[w.Na],"%b":w=>Zr[w.Ua].substring(0,3),"%B":w=>Zr[w.Ua],"%C":w=>A((w.Sa+1900)/100|0,2),"%d":w=>A(w.Xa,2),"%e":w=>_(w.Xa,2," "),"%g":w=>Ue(w).toString().substring(2),"%G":w=>Ue(w),"%H":w=>A(w.Ta,2),"%I":w=>(w=w.Ta,w==0?w=12:12<w&&(w-=12),A(w,2)),"%j":w=>{for(var j=0,te=0;te<=w.Ua-1;j+=(at(w.Sa+1900)?Wr:Hr)[te++]);return A(w.Xa+j,3)},"%m":w=>A(w.Ua+1,2),"%M":w=>A(w.nb,2),"%n":()=>`
+`,"%p":w=>0<=w.Ta&&12>w.Ta?"AM":"PM","%S":w=>A(w.ob,2),"%t":()=>"	","%u":w=>w.Na||7,"%U":w=>A(Math.floor((w.Ra+7-w.Na)/7),2),"%V":w=>{var j=Math.floor((w.Ra+7-(w.Na+6)%7)/7);if(2>=(w.Na+371-w.Ra-2)%7&&j++,j)j==53&&(te=(w.Na+371-w.Ra)%7,te==4||te==3&&at(w.Sa)||(j=1));else{j=52;var te=(w.Na+7-w.Ra-1)%7;(te==4||te==5&&at(w.Sa%400-1))&&j++}return A(j,2)},"%w":w=>w.Na,"%W":w=>A(Math.floor((w.Ra+7-(w.Na+6)%7)/7),2),"%y":w=>(w.Sa+1900).toString().substring(2),"%Y":w=>w.Sa+1900,"%z":w=>{w=w.mb;var j=0<=w;return w=Math.abs(w)/60,(j?"+":"-")+("0000"+(w/60*100+w%60)).slice(-4)},"%Z":w=>w.pb,"%%":()=>"%"},u=u.replace(/%%/g,"\0\0");for(be in ue)u.includes(be)&&(u=u.replace(new RegExp(be,"g"),ue[be](p)));return u=u.replace(/\0\0/g,"%"),be=Aa(u),be.length>a?0:(Ta(be,e),be.length-1)}F.Wa();var Sa=[I,Ct,b,D,W,le,yt,wt,y,$,q,De,bt,Tr,Sr,Mr,Pr,Rr,Fr,Ir,Br,Lr,kr,Nr],Ma={b:function(e,a,u){throw e>>>=0,new o(e).Wa(a>>>0,u>>>0),l=e,c++,l},L:function(e){zr(e>>>0,!x,1,!C,131072,!1),F.ab()},j:function(e){e>>>=0,T?postMessage({cmd:"cleanupThread",thread:e}):F.Za(F.Ma[e])},H:S,h:D,S:W,D:le,F:yt,T:wt,Q:y,J:$,P:q,n:De,E:bt,B:Tr,R:Sr,C:Mr,p:()=>1,z:function(e,a){e>>>=0,e==a>>>0?setTimeout(()=>xt()):T?postMessage({targetThread:e,cmd:"checkMailbox"}):(e=F.Ma[e])&&e.postMessage({cmd:"checkMailbox"})},I:function(e,a,u,p){a>>>=0,Xt.length=u,p=p>>>0>>>3;for(var _=0;_<u;_++)Xt[_]=d()[p+_>>>0];return e=0>e?Ke[-e-1]:Sa[e],F.ib=a,a=e.apply(null,Xt),F.ib=0,a},K:Vt,o:function(e){P&&F.Ma[e>>>0].ref()},s:function(e,a,u){e=a+2097152>>>0<4194305-!!e?(e>>>0)+4294967296*a:NaN,u>>>=0,e=new Date(1e3*e),i()[u>>>2>>>0]=e.getUTCSeconds(),i()[u+4>>>2>>>0]=e.getUTCMinutes(),i()[u+8>>>2>>>0]=e.getUTCHours(),i()[u+12>>>2>>>0]=e.getUTCDate(),i()[u+16>>>2>>>0]=e.getUTCMonth(),i()[u+20>>>2>>>0]=e.getUTCFullYear()-1900,i()[u+24>>>2>>>0]=e.getUTCDay(),e=(e.getTime()-Date.UTC(e.getUTCFullYear(),0,1,0,0,0,0))/864e5|0,i()[u+28>>>2>>>0]=e},t:function(e,a,u){e=a+2097152>>>0<4194305-!!e?(e>>>0)+4294967296*a:NaN,u>>>=0,e=new Date(1e3*e),i()[u>>>2>>>0]=e.getSeconds(),i()[u+4>>>2>>>0]=e.getMinutes(),i()[u+8>>>2>>>0]=e.getHours(),i()[u+12>>>2>>>0]=e.getDate(),i()[u+16>>>2>>>0]=e.getMonth(),i()[u+20>>>2>>>0]=e.getFullYear()-1900,i()[u+24>>>2>>>0]=e.getDay(),a=(at(e.getFullYear())?Cr:xr)[e.getMonth()]+e.getDate()-1|0,i()[u+28>>>2>>>0]=a,i()[u+36>>>2>>>0]=-(60*e.getTimezoneOffset()),a=new Date(e.getFullYear(),6,1).getTimezoneOffset();var p=new Date(e.getFullYear(),0,1).getTimezoneOffset();e=(a!=p&&e.getTimezoneOffset()==Math.min(p,a))|0,i()[u+32>>>2>>>0]=e},u:function(e){e>>>=0;var a=new Date(i()[e+20>>>2>>>0]+1900,i()[e+16>>>2>>>0],i()[e+12>>>2>>>0],i()[e+8>>>2>>>0],i()[e+4>>>2>>>0],i()[e>>>2>>>0],0),u=i()[e+32>>>2>>>0],p=a.getTimezoneOffset(),_=new Date(a.getFullYear(),6,1).getTimezoneOffset(),A=new Date(a.getFullYear(),0,1).getTimezoneOffset(),M=Math.min(A,_);return 0>u?i()[e+32>>>2>>>0]=+(_!=A&&M==p):0<u!=(M==p)&&(_=Math.max(A,_),a.setTime(a.getTime()+6e4*((0<u?M:_)-p))),i()[e+24>>>2>>>0]=a.getDay(),u=(at(a.getFullYear())?Cr:xr)[a.getMonth()]+a.getDate()-1|0,i()[e+28>>>2>>>0]=u,i()[e>>>2>>>0]=a.getSeconds(),i()[e+4>>>2>>>0]=a.getMinutes(),i()[e+8>>>2>>>0]=a.getHours(),i()[e+12>>>2>>>0]=a.getDate(),i()[e+16>>>2>>>0]=a.getMonth(),i()[e+20>>>2>>>0]=a.getYear(),e=a.getTime(),isNaN(e)?(i()[Gr()>>>2>>>0]=61,e=-1):e/=1e3,Vr((Le=e,1<=+Math.abs(Le)?0<Le?+Math.floor(Le/4294967296)>>>0:~~+Math.ceil((Le-+(~~Le>>>0))/4294967296)>>>0:0)),e>>>0},q:Pr,r:Rr,y:function(e,a,u){function p(ue){return(ue=ue.toTimeString().match(/\(([A-Za-z ]+)\)$/))?ue[1]:"GMT"}e>>>=0,a>>>=0,u>>>=0;var _=new Date().getFullYear(),A=new Date(_,0,1),M=new Date(_,6,1);_=A.getTimezoneOffset();var ee=M.getTimezoneOffset(),Ue=Math.max(_,ee);m()[e>>>2>>>0]=60*Ue,i()[a>>>2>>>0]=+(_!=ee),e=p(A),a=p(M),e=Dr(e),a=Dr(a),ee<_?(m()[u>>>2>>>0]=e,m()[u+4>>>2>>>0]=a):(m()[u>>>2>>>0]=a,m()[u+4>>>2>>>0]=e)},c:()=>{Ie("")},O:function(e,a,u){e>>>=0,a>>>=0,u>>>=0,Jt.length=0;for(var p;p=f()[a++>>>0];){var _=p!=105;_&=p!=112,u+=_&&u%8?4:0,Jt.push(p==112?m()[u>>>2>>>0]:p==105?i()[u>>>2>>>0]:d()[u>>>3>>>0]),u+=_?8:4}return Ke[e].apply(null,Jt)},k:()=>{},i:()=>Date.now(),U:()=>{throw ze+=1,"unwind"},A:function(){return 4294901760},e:()=>performance.timeOrigin+performance.now(),f:()=>P?(Nn(),Ve(kn)).cpus().length:navigator.hardwareConcurrency,x:function(e){e>>>=0;var a=f().length;if(e<=a||4294901760<e)return!1;for(var u=1;4>=u;u*=2){var p=a*(1+.2/u);p=Math.min(p,e+100663296);var _=Math;p=Math.max(e,p);e:{_=(_.min.call(_,4294901760,p+(65536-p%65536)%65536)-re.buffer.byteLength+65535)/65536;try{re.grow(_),J();var A=1;break e}catch{}A=void 0}if(A)return!0}return!1},M:Fr,N:Ir,G:nt,g:Br,m:Lr,v:kr,l:Nr,a:re||s.wasmMemory,w:$r,d:function(e,a,u,p){return $r(e>>>0,a>>>0,u>>>0,p>>>0)}},U=function(){function e(u,p){return U=u.exports,U=Ca(),F.bb.push(U.za),gt=U.Aa,xe.unshift(U.V),Se=p,Pe(),U}var a={a:Ma};if(Te++,s.instantiateWasm)try{return s.instantiateWasm(a,e)}catch(u){ie(`Module.instantiateWasm callback failed with error: ${u}`),g(u)}return At(a,function(u){e(u.instance,u.module)}).catch(g),{}}();s._OrtInit=(e,a)=>(s._OrtInit=U.W)(e,a),s._OrtGetLastError=(e,a)=>(s._OrtGetLastError=U.X)(e,a),s._OrtCreateSessionOptions=(e,a,u,p,_,A,M,ee,Ue,ue)=>(s._OrtCreateSessionOptions=U.Y)(e,a,u,p,_,A,M,ee,Ue,ue),s._OrtAppendExecutionProvider=(e,a)=>(s._OrtAppendExecutionProvider=U.Z)(e,a),s._OrtAddFreeDimensionOverride=(e,a,u)=>(s._OrtAddFreeDimensionOverride=U._)(e,a,u),s._OrtAddSessionConfigEntry=(e,a,u)=>(s._OrtAddSessionConfigEntry=U.$)(e,a,u),s._OrtReleaseSessionOptions=e=>(s._OrtReleaseSessionOptions=U.aa)(e),s._OrtCreateSession=(e,a,u)=>(s._OrtCreateSession=U.ba)(e,a,u),s._OrtReleaseSession=e=>(s._OrtReleaseSession=U.ca)(e),s._OrtGetInputOutputCount=(e,a,u)=>(s._OrtGetInputOutputCount=U.da)(e,a,u),s._OrtGetInputName=(e,a)=>(s._OrtGetInputName=U.ea)(e,a),s._OrtGetOutputName=(e,a)=>(s._OrtGetOutputName=U.fa)(e,a),s._OrtFree=e=>(s._OrtFree=U.ga)(e),s._OrtCreateTensor=(e,a,u,p,_,A)=>(s._OrtCreateTensor=U.ha)(e,a,u,p,_,A),s._OrtGetTensorData=(e,a,u,p,_)=>(s._OrtGetTensorData=U.ia)(e,a,u,p,_),s._OrtReleaseTensor=e=>(s._OrtReleaseTensor=U.ja)(e),s._OrtCreateRunOptions=(e,a,u,p)=>(s._OrtCreateRunOptions=U.ka)(e,a,u,p),s._OrtAddRunConfigEntry=(e,a,u)=>(s._OrtAddRunConfigEntry=U.la)(e,a,u),s._OrtReleaseRunOptions=e=>(s._OrtReleaseRunOptions=U.ma)(e),s._OrtCreateBinding=e=>(s._OrtCreateBinding=U.na)(e),s._OrtBindInput=(e,a,u)=>(s._OrtBindInput=U.oa)(e,a,u),s._OrtBindOutput=(e,a,u,p)=>(s._OrtBindOutput=U.pa)(e,a,u,p),s._OrtClearBoundOutputs=e=>(s._OrtClearBoundOutputs=U.qa)(e),s._OrtReleaseBinding=e=>(s._OrtReleaseBinding=U.ra)(e),s._OrtRunWithBinding=(e,a,u,p,_)=>(s._OrtRunWithBinding=U.sa)(e,a,u,p,_),s._OrtRun=(e,a,u,p,_,A,M,ee)=>(s._OrtRun=U.ta)(e,a,u,p,_,A,M,ee),s._OrtEndProfiling=e=>(s._OrtEndProfiling=U.ua)(e);var Gr=()=>(Gr=U.va)(),Pt=s._pthread_self=()=>(Pt=s._pthread_self=U.wa)(),jr=s._malloc=e=>(jr=s._malloc=U.xa)(e);s._free=e=>(s._free=U.ya)(e),s.__emscripten_tls_init=()=>(s.__emscripten_tls_init=U.za)();var zr=s.__emscripten_thread_init=(e,a,u,p,_,A)=>(zr=s.__emscripten_thread_init=U.Ba)(e,a,u,p,_,A);s.__emscripten_thread_crashed=()=>(s.__emscripten_thread_crashed=U.Ca)();var Yr=(e,a,u,p)=>(Yr=U.Da)(e,a,u,p),Kt=e=>(Kt=U.Ea)(e),er=s.__emscripten_thread_exit=e=>(er=s.__emscripten_thread_exit=U.Fa)(e),qr=()=>(qr=U.Ga)(),Vr=e=>(Vr=U.Ha)(e),Xr=(e,a)=>(Xr=U.Ia)(e,a),tr=()=>(tr=U.Ja)(),Rt=e=>(Rt=U.Ka)(e),rr=e=>(rr=U.La)(e);function Ca(){var e=U;e=Object.assign({},e);var a=p=>()=>p()>>>0,u=p=>_=>p(_)>>>0;return e.va=a(e.va),e.wa=a(e.wa),e.xa=u(e.xa),e.emscripten_main_runtime_thread_id=a(e.emscripten_main_runtime_thread_id),e.Ja=a(e.Ja),e.La=u(e.La),e}s.wasmMemory=re,s.stackAlloc=rr,s.stackSave=tr,s.stackRestore=Rt,s.keepRuntimeAlive=()=>0<ze,s.UTF8ToString=rt,s.stringToUTF8=fe,s.lengthBytesUTF8=oe,s.ExitStatus=We,s.PThread=F;var Dt;we=function e(){Dt||Jr(),Dt||(we=e)};function Jr(){if(!(0<Te))if(T)h(s),T||Ye(xe),startWorker(s);else{if(s.preRun)for(typeof s.preRun=="function"&&(s.preRun=[s.preRun]);s.preRun.length;)Ge.unshift(s.preRun.shift());Ye(Ge),0<Te||Dt||(Dt=!0,s.calledRun=!0,Ee||(T||Ye(xe),h(s),T||Ye(Ae)))}}return Jr(),t.ready}})();typeof Hn=="object"&&typeof mr=="object"?mr.exports=Wn:typeof define=="function"&&define.amd&&define([],()=>Wn)});var Gn=ot((ti,Na)=>{Na.exports='"use strict";var Module={},ENVIRONMENT_IS_NODE=typeof process=="object"&&typeof process.versions=="object"&&typeof process.versions.node=="string";if(ENVIRONMENT_IS_NODE){var nodeWorkerThreads=require("worker_threads"),parentPort=nodeWorkerThreads.parentPort;parentPort.on("message",e=>onmessage({data:e}));var fs=require("fs"),vm=require("vm");Object.assign(global,{self:global,require,Module,location:{href:__filename},Worker:nodeWorkerThreads.Worker,importScripts:e=>vm.runInThisContext(fs.readFileSync(e,"utf8"),{filename:e}),postMessage:e=>parentPort.postMessage(e),performance:global.performance||{now:Date.now}})}var initializedJS=!1;function threadPrintErr(){var e=Array.prototype.slice.call(arguments).join(" ");if(ENVIRONMENT_IS_NODE){fs.writeSync(2,e+`\n`);return}console.error(e)}function threadAlert(){var e=Array.prototype.slice.call(arguments).join(" ");postMessage({cmd:"alert",text:e,threadId:Module._pthread_self()})}var err=threadPrintErr;self.alert=threadAlert,Module.instantiateWasm=(e,t)=>{var a=Module.wasmModule;Module.wasmModule=null;var r=new WebAssembly.Instance(a,e);return t(r)},self.onunhandledrejection=e=>{throw e.reason||e};function handleMessage(e){try{if(e.data.cmd==="load"){let a=[];self.onmessage=r=>a.push(r),self.startWorker=r=>{Module=r,postMessage({cmd:"loaded"});for(let s of a)handleMessage(s);self.onmessage=handleMessage},Module.wasmModule=e.data.wasmModule;for(const r of e.data.handlers)Module[r]=(...s)=>{postMessage({cmd:"callHandler",handler:r,args:s})};if(Module.wasmMemory=e.data.wasmMemory,Module.buffer=Module.wasmMemory.buffer,Module.ENVIRONMENT_IS_PTHREAD=!0,typeof e.data.urlOrBlob=="string")importScripts(e.data.urlOrBlob);else{var t=URL.createObjectURL(e.data.urlOrBlob);importScripts(t),URL.revokeObjectURL(t)}ortWasmThreaded(Module)}else if(e.data.cmd==="run"){Module.__emscripten_thread_init(e.data.pthread_ptr,0,0,1),Module.__emscripten_thread_mailbox_await(e.data.pthread_ptr),Module.establishStackSpace(),Module.PThread.receiveObjectTransfer(e.data),Module.PThread.threadInitTLS(),initializedJS||(initializedJS=!0);try{Module.invokeEntryPoint(e.data.start_routine,e.data.arg)}catch(a){if(a!="unwind")throw a}}else e.data.cmd==="cancel"?Module._pthread_self()&&Module.__emscripten_thread_exit(-1):e.data.target==="setimmediate"||(e.data.cmd==="checkMailbox"?initializedJS&&Module.checkMailbox():e.data.cmd&&(err(`worker.js received unknown command ${e.data.cmd}`),err(e.data)))}catch(a){throw Module.__emscripten_thread_crashed?.(),a}}self.onmessage=handleMessage;\n'});var zn,Wa,hr,gr,Wt,jn,Ha,$a,Ga,Yn,ne,ut=H(()=>{"use strict";zn=In();Wa=$n(),gr=!1,Wt=!1,jn=!1,Ha=r=>{if(r===1)return!1;if(typeof SharedArrayBuffer>"u")return typeof self<"u"&&!self.crossOriginIsolated&&console.warn("env.wasm.numThreads is set to "+r+", but this will not work unless you enable crossOriginIsolated mode. See https://web.dev/cross-origin-isolation-guide/ for more info."),!1;typeof process<"u"&&process.versions&&process.versions.node&&console.warn("env.wasm.numThreads is set to "+r+", however, currently onnxruntime-web does not support multi-threads in Node.js. Please consider using onnxruntime-node for performance critical scenarios.");try{return typeof MessageChannel<"u"&&new MessageChannel().port1.postMessage(new SharedArrayBuffer(1)),WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,5,4,1,3,1,1,10,11,1,9,0,65,0,254,16,2,0,26,11]))}catch{return!1}},$a=()=>{try{return WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,30,1,28,0,65,0,253,15,253,12,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,253,186,1,26,11]))}catch{return!1}},Ga=(r,t)=>r?t?"ort-wasm-simd-threaded.wasm":"ort-wasm-simd.wasm":t?"ort-wasm-threaded.wasm":"ort-wasm.wasm",Yn=async r=>{if(gr)return Promise.resolve();if(Wt)throw new Error("multiple calls to 'initializeWebAssembly()' detected.");if(jn)throw new Error("previous call to 'initializeWebAssembly()' failed.");Wt=!0;let t=r.initTimeout,n=r.numThreads,f=r.simd,i=Ha(n),m=f&&$a(),d=r.wasmPaths,s=typeof d=="string"?d:void 0,h=Ga(m,i),g=typeof d=="object"?d[h]:void 0,O=!1,E=[];if(t>0&&E.push(new Promise(v=>{setTimeout(()=>{O=!0,v()},t)})),E.push(new Promise((v,C)=>{let x=i?Wa:zn,P={locateFile:(T,B)=>i&&T.endsWith(".worker.js")&&typeof Blob<"u"?URL.createObjectURL(new Blob([Gn()],{type:"text/javascript"})):T.endsWith(".wasm")?g||(s??B)+h:B+T};if(i)if(P.numThreads=n,typeof Blob>"u")P.mainScriptUrlOrBlob=(void 0)(__dirname,"ort-wasm-threaded.js");else{let T=`var ortWasmThreaded=${x.toString()};`;P.mainScriptUrlOrBlob=new Blob([T],{type:"text/javascript"})}x(P).then(T=>{Wt=!1,gr=!0,hr=T,v()},T=>{Wt=!1,jn=!0,C(T)})})),await Promise.race(E),O)throw new Error(`WebAssembly backend initializing failed due to timeout: ${t}ms`)},ne=()=>{if(gr&&hr)return hr;throw new Error("WebAssembly is not initialized yet.")}});var Z,Ot,K,Ht=H(()=>{"use strict";ut();Z=(r,t)=>{let n=ne(),f=n.lengthBytesUTF8(r)+1,i=n._malloc(f);return n.stringToUTF8(r,i,f),t.push(i),i},Ot=(r,t,n,f)=>{if(typeof r=="object"&&r!==null){if(n.has(r))throw new Error("Circular reference in options");n.add(r)}Object.entries(r).forEach(([i,m])=>{let d=t?t+i:i;if(typeof m=="object")Ot(m,d+".",n,f);else if(typeof m=="string"||typeof m=="number")f(d,m.toString());else if(typeof m=="boolean")f(d,m?"1":"0");else throw new Error(`Can't handle extra config type: ${typeof m}`)})},K=r=>{let t=ne(),n=t.stackSave();try{let f=t.stackAlloc(8);t._OrtGetLastError(f,f+4);let i=t.HEAP32[f/4],m=t.HEAPU32[f/4+1],d=m?t.UTF8ToString(m):"";throw new Error(`${r} ERROR_CODE: ${i}, ERROR_MESSAGE: ${d}`)}finally{t.stackRestore(n)}}});var qn,Vn=H(()=>{"use strict";ut();Ht();qn=r=>{let t=ne(),n=0,f=[],i=r||{};try{if(r?.logSeverityLevel===void 0)i.logSeverityLevel=2;else if(typeof r.logSeverityLevel!="number"||!Number.isInteger(r.logSeverityLevel)||r.logSeverityLevel<0||r.logSeverityLevel>4)throw new Error(`log serverity level is not valid: ${r.logSeverityLevel}`);if(r?.logVerbosityLevel===void 0)i.logVerbosityLevel=0;else if(typeof r.logVerbosityLevel!="number"||!Number.isInteger(r.logVerbosityLevel))throw new Error(`log verbosity level is not valid: ${r.logVerbosityLevel}`);r?.terminate===void 0&&(i.terminate=!1);let m=0;return r?.tag!==void 0&&(m=Z(r.tag,f)),n=t._OrtCreateRunOptions(i.logSeverityLevel,i.logVerbosityLevel,!!i.terminate,m),n===0&&K("Can't create run options."),r?.extra!==void 0&&Ot(r.extra,"",new WeakSet,(d,s)=>{let h=Z(d,f),g=Z(s,f);t._OrtAddRunConfigEntry(n,h,g)!==0&&K(`Can't set a run config entry: ${d} - ${s}.`)}),[n,f]}catch(m){throw n!==0&&t._OrtReleaseRunOptions(n),f.forEach(d=>t._free(d)),m}}});var ja,za,Ya,qa,Xn,Jn=H(()=>{"use strict";ut();Ht();ja=r=>{switch(r){case"disabled":return 0;case"basic":return 1;case"extended":return 2;case"all":return 99;default:throw new Error(`unsupported graph optimization level: ${r}`)}},za=r=>{switch(r){case"sequential":return 0;case"parallel":return 1;default:throw new Error(`unsupported execution mode: ${r}`)}},Ya=r=>{r.extra||(r.extra={}),r.extra.session||(r.extra.session={});let t=r.extra.session;t.use_ort_model_bytes_directly||(t.use_ort_model_bytes_directly="1"),r.executionProviders&&r.executionProviders.some(n=>(typeof n=="string"?n:n.name)==="webgpu")&&(r.enableMemPattern=!1)},qa=(r,t,n)=>{for(let f of t){let i=typeof f=="string"?f:f.name;switch(i){case"webnn":if(i="WEBNN",typeof f!="string"){let d=f;if(d?.deviceType){let s=Z("deviceType",n),h=Z(d.deviceType,n);ne()._OrtAddSessionConfigEntry(r,s,h)!==0&&K(`Can't set a session config entry: 'deviceType' - ${d.deviceType}.`)}if(d?.numThreads){let s=d.numThreads;(typeof s!="number"||!Number.isInteger(s)||s<0)&&(s=0);let h=Z("numThreads",n),g=Z(s.toString(),n);ne()._OrtAddSessionConfigEntry(r,h,g)!==0&&K(`Can't set a session config entry: 'numThreads' - ${d.numThreads}.`)}if(d?.powerPreference){let s=Z("powerPreference",n),h=Z(d.powerPreference,n);ne()._OrtAddSessionConfigEntry(r,s,h)!==0&&K(`Can't set a session config entry: 'powerPreference' - ${d.powerPreference}.`)}}break;case"webgpu":if(i="JS",typeof f!="string"){let d=f;if(d?.preferredLayout){if(d.preferredLayout!=="NCHW"&&d.preferredLayout!=="NHWC")throw new Error(`preferredLayout must be either 'NCHW' or 'NHWC': ${d.preferredLayout}`);let s=Z("preferredLayout",n),h=Z(d.preferredLayout,n);ne()._OrtAddSessionConfigEntry(r,s,h)!==0&&K(`Can't set a session config entry: 'preferredLayout' - ${d.preferredLayout}.`)}}break;case"wasm":case"cpu":continue;default:throw new Error(`not supported execution provider: ${i}`)}let m=Z(i,n);ne()._OrtAppendExecutionProvider(r,m)!==0&&K(`Can't append execution provider: ${i}.`)}},Xn=r=>{let t=ne(),n=0,f=[],i=r||{};Ya(i);try{let m=ja(i.graphOptimizationLevel??"all"),d=za(i.executionMode??"sequential"),s=typeof i.logId=="string"?Z(i.logId,f):0,h=i.logSeverityLevel??2;if(!Number.isInteger(h)||h<0||h>4)throw new Error(`log serverity level is not valid: ${h}`);let g=i.logVerbosityLevel??0;if(!Number.isInteger(g)||g<0||g>4)throw new Error(`log verbosity level is not valid: ${g}`);let O=typeof i.optimizedModelFilePath=="string"?Z(i.optimizedModelFilePath,f):0;if(n=t._OrtCreateSessionOptions(m,!!i.enableCpuMemArena,!!i.enableMemPattern,d,!!i.enableProfiling,0,s,h,g,O),n===0&&K("Can't create session options."),i.executionProviders&&qa(n,i.executionProviders,f),i.enableGraphCapture!==void 0){if(typeof i.enableGraphCapture!="boolean")throw new Error(`enableGraphCapture must be a boolean value: ${i.enableGraphCapture}`);let E=Z("enableGraphCapture",f),v=Z(i.enableGraphCapture.toString(),f);t._OrtAddSessionConfigEntry(n,E,v)!==0&&K(`Can't set a session config entry: 'enableGraphCapture' - ${i.enableGraphCapture}.`)}if(i.freeDimensionOverrides)for(let[E,v]of Object.entries(i.freeDimensionOverrides)){if(typeof E!="string")throw new Error(`free dimension override name must be a string: ${E}`);if(typeof v!="number"||!Number.isInteger(v)||v<0)throw new Error(`free dimension override value must be a non-negative integer: ${v}`);let C=Z(E,f);t._OrtAddFreeDimensionOverride(n,C,v)!==0&&K(`Can't set a free dimension override: ${E} - ${v}.`)}return i.extra!==void 0&&Ot(i.extra,"",new WeakSet,(E,v)=>{let C=Z(E,f),x=Z(v,f);t._OrtAddSessionConfigEntry(n,C,x)!==0&&K(`Can't set a session config entry: ${E} - ${v}.`)}),[n,f]}catch(m){throw n!==0&&t._OrtReleaseSessionOptions(n),f.forEach(d=>t._free(d)),m}}});var yr,Qn,wr,Zn,Kn,$t,ea,br=H(()=>{"use strict";yr=r=>{switch(r){case"int8":return 3;case"uint8":return 2;case"bool":return 9;case"int16":return 5;case"uint16":return 4;case"int32":return 6;case"uint32":return 12;case"float16":return 10;case"float32":return 1;case"float64":return 11;case"string":return 8;case"int64":return 7;case"uint64":return 13;default:throw new Error(`unsupported data type: ${r}`)}},Qn=r=>{switch(r){case 3:return"int8";case 2:return"uint8";case 9:return"bool";case 5:return"int16";case 4:return"uint16";case 6:return"int32";case 12:return"uint32";case 10:return"float16";case 1:return"float32";case 11:return"float64";case 8:return"string";case 7:return"int64";case 13:return"uint64";default:throw new Error(`unsupported data type: ${r}`)}},wr=r=>[void 0,4,1,1,2,2,4,8,void 0,1,2,8,4,8,void 0,void 0,void 0][r],Zn=r=>{switch(r){case"float16":return typeof Float16Array<"u"&&Float16Array.from?Float16Array:Uint16Array;case"float32":return Float32Array;case"uint8":return Uint8Array;case"int8":return Int8Array;case"uint16":return Uint16Array;case"int16":return Int16Array;case"int32":return Int32Array;case"bool":return Uint8Array;case"float64":return Float64Array;case"uint32":return Uint32Array;case"int64":return BigInt64Array;case"uint64":return BigUint64Array;default:throw new Error(`unsupported type: ${r}`)}},Kn=r=>{switch(r){case"verbose":return 0;case"info":return 1;case"warning":return 2;case"error":return 3;case"fatal":return 4;default:throw new Error(`unsupported logging level: ${r}`)}},$t=r=>r==="float32"||r==="float16"||r==="int32"||r==="int64"||r==="uint32"||r==="uint8"||r==="bool",ea=r=>{switch(r){case"none":return 0;case"cpu":return 1;case"cpu-pinned":return 2;case"texture":return 3;case"gpu-buffer":return 4;default:throw new Error(`unsupported data location: ${r}`)}}});var Et,vr=H(()=>{"use strict";Et=async r=>{if(typeof r=="string")if(typeof process<"u"&&process.versions&&process.versions.node)try{return new Uint8Array(await(void 0)(r))}catch(t){if(t.code==="ERR_FS_FILE_TOO_LARGE"){let n=(void 0)(r),f=[];for await(let i of n)f.push(i);return new Uint8Array(Buffer.concat(f))}throw t}else{let t=await fetch(r);if(!t.ok)throw new Error(`failed to load external data file: ${r}`);let n=t.headers.get("Content-Length"),f=n?parseInt(n,10):0;if(f<1073741824)return new Uint8Array(await t.arrayBuffer());{if(!t.body)throw new Error(`failed to load external data file: ${r}, no response body.`);let i=t.body.getReader(),m;try{m=new ArrayBuffer(f)}catch(s){if(s instanceof RangeError){let h=Math.ceil(f/65536);m=new WebAssembly.Memory({initial:h,maximum:h}).buffer}else throw s}let d=0;for(;;){let{done:s,value:h}=await i.read();if(s)break;let g=h.byteLength;new Uint8Array(m,d,g).set(h),d+=g}return new Uint8Array(m,0,f)}}else return r instanceof Blob?new Uint8Array(await r.arrayBuffer()):r instanceof Uint8Array?r:new Uint8Array(r)}});var Va,ra,na,ft,Xa,Or,aa,oa,ta,ia,sa,ua,fa=H(()=>{"use strict";Vn();Jn();br();ut();Ht();vr();Va=(r,t)=>{ne()._OrtInit(r,t)!==0&&K("Can't initialize onnxruntime.")},ra=async r=>{Va(r.wasm.numThreads,Kn(r.logLevel))},na=async(r,t)=>{},ft=new Map,Xa=r=>{let t=ne(),n=t.stackSave();try{let f=t.stackAlloc(8);return t._OrtGetInputOutputCount(r,f,f+4)!==0&&K("Can't get session input/output count."),[t.HEAP32[f/4],t.HEAP32[f/4+1]]}finally{t.stackRestore(n)}},Or=r=>{let t=ne(),n=t._malloc(r.byteLength);if(n===0)throw new Error(`Can't create a session. failed to allocate a buffer of size ${r.byteLength}.`);return t.HEAPU8.set(r,n),[n,r.byteLength]},aa=async(r,t)=>{let n,f,i=ne();Array.isArray(r)?[n,f]=r:r.buffer===i.HEAPU8.buffer?[n,f]=[r.byteOffset,r.byteLength]:[n,f]=Or(r);let m=0,d=0,s=0,h=[],g=[],O=[];try{if([d,h]=Xn(t),t?.externalData&&i.mountExternalData){let k=[];for(let N of t.externalData){let V=typeof N=="string"?N:N.path;k.push(Et(typeof N=="string"?N:N.data).then(Y=>{i.mountExternalData(V,Y)}))}await Promise.all(k)}m=await i._OrtCreateSession(n,f,d),m===0&&K("Can't create a session.");let[E,v]=Xa(m),C=!!t?.enableGraphCapture,x=[],P=[],T=[];for(let k=0;k<E;k++){let N=i._OrtGetInputName(m,k);N===0&&K("Can't get an input name."),g.push(N),x.push(i.UTF8ToString(N))}for(let k=0;k<v;k++){let N=i._OrtGetOutputName(m,k);N===0&&K("Can't get an output name."),O.push(N);let V=i.UTF8ToString(N);P.push(V)}let B=null;return ft.set(m,[m,g,O,B,C,!1]),[m,x,P]}catch(E){throw g.forEach(v=>i._OrtFree(v)),O.forEach(v=>i._OrtFree(v)),s!==0&&i._OrtReleaseBinding(s),m!==0&&i._OrtReleaseSession(m),E}finally{i._free(n),d!==0&&i._OrtReleaseSessionOptions(d),h.forEach(E=>i._free(E)),i.unmountExternalData?.()}},oa=r=>{let t=ne(),n=ft.get(r);if(!n)throw new Error(`cannot release session. invalid session id: ${r}`);let[f,i,m,d,s]=n;d&&(s&&t._OrtClearBoundOutputs(d.handle),t._OrtReleaseBinding(d.handle)),t.jsepOnReleaseSession?.(r),i.forEach(h=>t._OrtFree(h)),m.forEach(h=>t._OrtFree(h)),t._OrtReleaseSession(f),ft.delete(r)},ta=(r,t,n,f,i,m=!1)=>{if(!r){t.push(0);return}let d=ne(),s=r[0],h=r[1],g=r[3],O,E;if(s==="string"&&g==="gpu-buffer")throw new Error("String tensor is not supported on GPU.");if(m&&g!=="gpu-buffer")throw new Error(`External buffer must be provided for input/output index ${i} when enableGraphCapture is true.`);if(g==="gpu-buffer"){let x=r[2].gpuBuffer,P=wr(yr(s));E=h.reduce((B,k)=>B*k,1)*P;let T=d.jsepRegisterBuffer;if(!T)throw new Error('Tensor location "gpu-buffer" is not supported without using WebGPU.');O=T(f,i,x,E)}else{let x=r[2];if(Array.isArray(x)){E=4*x.length,O=d._malloc(E),n.push(O);let P=O/4;for(let T=0;T<x.length;T++){if(typeof x[T]!="string")throw new TypeError(`tensor data at index ${T} is not a string`);d.HEAPU32[P++]=Z(x[T],n)}}else E=x.byteLength,O=d._malloc(E),n.push(O),d.HEAPU8.set(new Uint8Array(x.buffer,x.byteOffset,E),O)}let v=d.stackSave(),C=d.stackAlloc(4*h.length);try{let x=C/4;h.forEach(T=>d.HEAP32[x++]=T);let P=d._OrtCreateTensor(yr(s),O,E,C,h.length,ea(g));P===0&&K(`Can't create tensor for input/output. session=${f}, index=${i}.`),t.push(P)}finally{d.stackRestore(v)}},ia=async(r,t,n,f,i,m)=>{let d=ne(),s=ft.get(r);if(!s)throw new Error(`cannot run inference. invalid session id: ${r}`);let h=s[0],g=s[1],O=s[2],E=s[3],v=s[4],C=s[5],x=t.length,P=f.length,T=0,B=[],k=[],N=[],V=[],Y=d.stackSave(),R=d.stackAlloc(x*4),X=d.stackAlloc(x*4),Fe=d.stackAlloc(P*4),Ne=d.stackAlloc(P*4);try{[T,B]=qn(m);for(let L=0;L<x;L++)ta(n[L],k,V,r,t[L],v);for(let L=0;L<P;L++)ta(i[L],N,V,r,x+f[L],v);let me=R/4,ie=X/4,re=Fe/4,Se=Ne/4;for(let L=0;L<x;L++)d.HEAPU32[me++]=k[L],d.HEAPU32[ie++]=g[t[L]];for(let L=0;L<P;L++)d.HEAPU32[re++]=N[L],d.HEAPU32[Se++]=O[f[L]];d.jsepOnRunStart?.(h);let Ee;Ee=await d._OrtRun(h,X,R,x,Ne,P,Fe,T),Ee!==0&&K("failed to call OrtRun().");let se=[];for(let L=0;L<P;L++){let _e=d.HEAPU32[Fe/4+L];if(_e===N[L]){se.push(i[L]);continue}let Me=d.stackSave(),de=d.stackAlloc(4*4),Ce=!1,J,ye=0;try{d._OrtGetTensorData(_e,de,de+4,de+8,de+12)!==0&&K(`Can't access output tensor data on index ${L}.`);let xe=de/4,Ae=d.HEAPU32[xe++];ye=d.HEAPU32[xe++];let Te=d.HEAPU32[xe++],je=d.HEAPU32[xe++],we=[];for(let ae=0;ae<je;ae++)we.push(d.HEAPU32[Te/4+ae]);d._OrtFree(Te);let Pe=we.reduce((ae,Q)=>ae*Q,1);J=Qn(Ae);let Ie=E?.outputPreferredLocations[f[L]];if(J==="string"){if(Ie==="gpu-buffer")throw new Error("String tensor is not supported on GPU.");let ae=[],Q=ye/4;for(let pe=0;pe<Pe;pe++){let Be=d.HEAPU32[Q++],Re=pe===Pe-1?void 0:d.HEAPU32[Q]-Be;ae.push(d.UTF8ToString(Be,Re))}se.push([J,we,ae,"cpu"])}else if(Ie==="gpu-buffer"&&Pe>0){let ae=d.jsepGetBuffer;if(!ae)throw new Error('preferredLocation "gpu-buffer" is not supported without using WebGPU.');let Q=ae(ye),pe=wr(Ae);if(pe===void 0||!$t(J))throw new Error(`Unsupported data type: ${J}`);Ce=!0,se.push([J,we,{gpuBuffer:Q,download:d.jsepCreateDownloader(Q,Pe*pe,J),dispose:()=>{d._OrtReleaseTensor(_e)}},"gpu-buffer"])}else{let ae=Zn(J),Q=new ae(Pe);new Uint8Array(Q.buffer,Q.byteOffset,Q.byteLength).set(d.HEAPU8.subarray(ye,ye+Q.byteLength)),se.push([J,we,Q,"cpu"])}}finally{d.stackRestore(Me),J==="string"&&ye&&d._free(ye),Ce||d._OrtReleaseTensor(_e)}}return E&&!v&&(d._OrtClearBoundOutputs(E.handle),ft.set(r,[h,g,O,E,v,!1])),se}finally{d.stackRestore(Y),k.forEach(me=>d._OrtReleaseTensor(me)),N.forEach(me=>d._OrtReleaseTensor(me)),V.forEach(me=>d._free(me)),T!==0&&d._OrtReleaseRunOptions(T),B.forEach(me=>d._free(me))}},sa=r=>{let t=ne(),n=ft.get(r);if(!n)throw new Error("invalid session id");let f=n[0],i=t._OrtEndProfiling(f);i===0&&K("Can't get an profile file name."),t._OrtFree(i)},ua=r=>{let t=[];for(let n of r){let f=n[2];!Array.isArray(f)&&"buffer"in f&&t.push(f.buffer)}return t}});var la=ot((Oi,Qa)=>{Qa.exports='/*!\n * ONNX Runtime Web v1.17.3\n * Copyright (c) Microsoft Corporation. All rights reserved.\n * Licensed under the MIT License.\n */\n"use strict";(()=>{var Et=Object.defineProperty;var Jr=Object.getOwnPropertyDescriptor;var Xr=Object.getOwnPropertyNames;var Qr=Object.prototype.hasOwnProperty;var St=(u,c)=>()=>(u&&(c=u(u=0)),c);var tt=(u,c)=>()=>(c||u((c={exports:{}}).exports,c),c.exports),At=(u,c)=>{for(var a in c)Et(u,a,{get:c[a],enumerable:!0})},Zr=(u,c,a,h)=>{if(c&&typeof c=="object"||typeof c=="function")for(let f of Xr(c))!Qr.call(u,f)&&f!==a&&Et(u,f,{get:()=>c[f],enumerable:!(h=Jr(c,f))||h.enumerable});return u};var rt=u=>Zr(Et({},"__esModule",{value:!0}),u);var Tt={};At(Tt,{createReadStream:()=>dr,readFile:()=>Kr,readFileSync:()=>en});var Kr,en,dr,Mt=St(()=>{Kr=void 0,en=void 0,dr=void 0});var Ct={};At(Ct,{join:()=>tn});var tn,Dt=St(()=>{tn=void 0});var gr=tt((mr,Ft)=>{"use strict";var pr=(()=>{var u=typeof document<"u"&&document.currentScript?document.currentScript.src:void 0;return typeof __filename<"u"&&(u=u||__filename),function(c={}){var a=c,h,f;a.ready=new Promise((r,o)=>{h=r,f=o});var w=Object.assign({},a),g="./this.program",i=typeof window=="object",E=typeof importScripts=="function",P=typeof process=="object"&&typeof process.versions=="object"&&typeof process.versions.node=="string",U="",D,x,K;if(P){var R=(Mt(),rt(Tt)),I=(Dt(),rt(Ct));U=E?I.dirname(U)+"/":__dirname+"/",D=(r,o)=>(r=ve(r)?new URL(r):I.normalize(r),R.readFileSync(r,o?void 0:"utf8")),K=r=>(r=D(r,!0),r.buffer||(r=new Uint8Array(r)),r),x=(r,o,s,m=!0)=>{r=ve(r)?new URL(r):I.normalize(r),R.readFile(r,m?void 0:"utf8",(O,A)=>{O?s(O):o(m?A.buffer:A)})},!a.thisProgram&&1<process.argv.length&&(g=process.argv[1].replace(/\\\\/g,"/")),process.argv.slice(2),a.inspect=()=>"[Emscripten Module object]"}else(i||E)&&(E?U=self.location.href:typeof document<"u"&&document.currentScript&&(U=document.currentScript.src),u&&(U=u),U.indexOf("blob:")!==0?U=U.substr(0,U.replace(/[?#].*/,"").lastIndexOf("/")+1):U="",D=r=>{var o=new XMLHttpRequest;return o.open("GET",r,!1),o.send(null),o.responseText},E&&(K=r=>{var o=new XMLHttpRequest;return o.open("GET",r,!1),o.responseType="arraybuffer",o.send(null),new Uint8Array(o.response)}),x=(r,o,s)=>{var m=new XMLHttpRequest;m.open("GET",r,!0),m.responseType="arraybuffer",m.onload=()=>{m.status==200||m.status==0&&m.response?o(m.response):s()},m.onerror=s,m.send(null)});var v=console.log.bind(console),k=console.error.bind(console);Object.assign(a,w),w=null,typeof WebAssembly!="object"&&F("no native wasm support detected");var W,H=!1,se,ee,S,j,Ce;function Ue(){var r=W.buffer;a.HEAP8=se=new Int8Array(r),a.HEAP16=new Int16Array(r),a.HEAPU8=ee=new Uint8Array(r),a.HEAPU16=new Uint16Array(r),a.HEAP32=S=new Int32Array(r),a.HEAPU32=j=new Uint32Array(r),a.HEAPF32=new Float32Array(r),a.HEAPF64=Ce=new Float64Array(r)}var ce=[],ne=[],Q=[],Oe=0,he=null,ae=null;function F(r){throw r="Aborted("+r+")",k(r),H=!0,r=new WebAssembly.RuntimeError(r+". Build with -sASSERTIONS for more info."),f(r),r}var ye=r=>r.startsWith("data:application/octet-stream;base64,"),ve=r=>r.startsWith("file://"),fe;if(fe="ort-wasm.wasm",!ye(fe)){var _e=fe;fe=a.locateFile?a.locateFile(_e,U):U+_e}function Y(r){if(K)return K(r);throw"both async and sync fetching of the wasm failed"}function pe(r){if(i||E){if(typeof fetch=="function"&&!ve(r))return fetch(r,{credentials:"same-origin"}).then(o=>{if(!o.ok)throw"failed to load wasm binary file at \'"+r+"\'";return o.arrayBuffer()}).catch(()=>Y(r));if(x)return new Promise((o,s)=>{x(r,m=>o(new Uint8Array(m)),s)})}return Promise.resolve().then(()=>Y(r))}function Ie(r,o,s){return pe(r).then(m=>WebAssembly.instantiate(m,o)).then(m=>m).then(s,m=>{k(`failed to asynchronously prepare wasm: ${m}`),F(m)})}function Ee(r,o){var s=fe;return typeof WebAssembly.instantiateStreaming!="function"||ye(s)||ve(s)||P||typeof fetch!="function"?Ie(s,r,o):fetch(s,{credentials:"same-origin"}).then(m=>WebAssembly.instantiateStreaming(m,r).then(o,function(O){return k(`wasm streaming compile failed: ${O}`),k("falling back to ArrayBuffer instantiation"),Ie(s,r,o)}))}var be,we={920016:(r,o,s,m)=>{if(typeof a>"u"||!a.za)return 1;if(r=z(r>>>0),r.startsWith("./")&&(r=r.substring(2)),r=a.za.get(r),!r)return 2;if(o>>>=0,s>>>=0,o+s>r.byteLength)return 3;try{return ee.set(r.subarray(o,o+s),m>>>0>>>0),0}catch{return 4}}};function Le(r){this.xa=r-24,this.Ha=function(o){j[this.xa+4>>>2>>>0]=o},this.Ga=function(o){j[this.xa+8>>>2>>>0]=o},this.Aa=function(o,s){this.Fa(),this.Ha(o),this.Ga(s)},this.Fa=function(){j[this.xa+16>>>2>>>0]=0}}var me=0,Se=0,De=typeof TextDecoder<"u"?new TextDecoder("utf8"):void 0,te=(r,o,s)=>{o>>>=0;var m=o+s;for(s=o;r[s]&&!(s>=m);)++s;if(16<s-o&&r.buffer&&De)return De.decode(r.subarray(o,s));for(m="";o<s;){var O=r[o++];if(O&128){var A=r[o++]&63;if((O&224)==192)m+=String.fromCharCode((O&31)<<6|A);else{var L=r[o++]&63;O=(O&240)==224?(O&15)<<12|A<<6|L:(O&7)<<18|A<<12|L<<6|r[o++]&63,65536>O?m+=String.fromCharCode(O):(O-=65536,m+=String.fromCharCode(55296|O>>10,56320|O&1023))}}else m+=String.fromCharCode(O)}return m},z=(r,o)=>(r>>>=0)?te(ee,r,o):"",le=r=>{for(var o=0,s=0;s<r.length;++s){var m=r.charCodeAt(s);127>=m?o++:2047>=m?o+=2:55296<=m&&57343>=m?(o+=4,++s):o+=3}return o},Fe=(r,o,s,m)=>{if(s>>>=0,!(0<m))return 0;var O=s;m=s+m-1;for(var A=0;A<r.length;++A){var L=r.charCodeAt(A);if(55296<=L&&57343>=L){var re=r.charCodeAt(++A);L=65536+((L&1023)<<10)|re&1023}if(127>=L){if(s>=m)break;o[s++>>>0]=L}else{if(2047>=L){if(s+1>=m)break;o[s++>>>0]=192|L>>6}else{if(65535>=L){if(s+2>=m)break;o[s++>>>0]=224|L>>12}else{if(s+3>=m)break;o[s++>>>0]=240|L>>18,o[s++>>>0]=128|L>>12&63}o[s++>>>0]=128|L>>6&63}o[s++>>>0]=128|L&63}}return o[s>>>0]=0,s-O},Ae=r=>r%4===0&&(r%100!==0||r%400===0),qe=[0,31,60,91,121,152,182,213,244,274,305,335],at=[0,31,59,90,120,151,181,212,243,273,304,334],xe=r=>{var o=le(r)+1,s=st(o);return s&&Fe(r,ee,s,o),s},Ne=[],Re={},He=()=>{if(!Ge){var r={USER:"web_user",LOGNAME:"web_user",PATH:"/",PWD:"/",HOME:"/home/web_user",LANG:(typeof navigator=="object"&&navigator.languages&&navigator.languages[0]||"C").replace("-","_")+".UTF-8",_:g||"./this.program"},o;for(o in Re)Re[o]===void 0?delete r[o]:r[o]=Re[o];var s=[];for(o in r)s.push(`${o}=${r[o]}`);Ge=s}return Ge},Ge,Be=[null,[],[]],Ve=[31,29,31,30,31,30,31,31,30,31,30,31],Je=[31,28,31,30,31,30,31,31,30,31,30,31];function $e(r){var o=Array(le(r)+1);return Fe(r,o,0,o.length),o}function ot(r,o,s,m){function O(d,B,$){for(d=typeof d=="number"?d.toString():d||"";d.length<B;)d=$[0]+d;return d}function A(d,B){return O(d,B,"0")}function L(d,B){function $(et){return 0>et?-1:0<et?1:0}var Te;return(Te=$(d.getFullYear()-B.getFullYear()))===0&&(Te=$(d.getMonth()-B.getMonth()))===0&&(Te=$(d.getDate()-B.getDate())),Te}function re(d){switch(d.getDay()){case 0:return new Date(d.getFullYear()-1,11,29);case 1:return d;case 2:return new Date(d.getFullYear(),0,3);case 3:return new Date(d.getFullYear(),0,2);case 4:return new Date(d.getFullYear(),0,1);case 5:return new Date(d.getFullYear()-1,11,31);case 6:return new Date(d.getFullYear()-1,11,30)}}function de(d){var B=d.ta;for(d=new Date(new Date(d.ua+1900,0,1).getTime());0<B;){var $=d.getMonth(),Te=(Ae(d.getFullYear())?Ve:Je)[$];if(B>Te-d.getDate())B-=Te-d.getDate()+1,d.setDate(1),11>$?d.setMonth($+1):(d.setMonth(0),d.setFullYear(d.getFullYear()+1));else{d.setDate(d.getDate()+B);break}}return $=new Date(d.getFullYear()+1,0,4),B=re(new Date(d.getFullYear(),0,4)),$=re($),0>=L(B,d)?0>=L($,d)?d.getFullYear()+1:d.getFullYear():d.getFullYear()-1}r>>>=0,o>>>=0,s>>>=0,m>>>=0;var ie=j[m+40>>>2>>>0];m={Da:S[m>>>2>>>0],Ca:S[m+4>>>2>>>0],va:S[m+8>>>2>>>0],ya:S[m+12>>>2>>>0],wa:S[m+16>>>2>>>0],ua:S[m+20>>>2>>>0],oa:S[m+24>>>2>>>0],ta:S[m+28>>>2>>>0],Ia:S[m+32>>>2>>>0],Ba:S[m+36>>>2>>>0],Ea:ie?z(ie):""},s=z(s),ie={"%c":"%a %b %d %H:%M:%S %Y","%D":"%m/%d/%y","%F":"%Y-%m-%d","%h":"%b","%r":"%I:%M:%S %p","%R":"%H:%M","%T":"%H:%M:%S","%x":"%m/%d/%y","%X":"%H:%M:%S","%Ec":"%c","%EC":"%C","%Ex":"%m/%d/%y","%EX":"%H:%M:%S","%Ey":"%y","%EY":"%Y","%Od":"%d","%Oe":"%e","%OH":"%H","%OI":"%I","%Om":"%m","%OM":"%M","%OS":"%S","%Ou":"%u","%OU":"%U","%OV":"%V","%Ow":"%w","%OW":"%W","%Oy":"%y"};for(var ue in ie)s=s.replace(new RegExp(ue,"g"),ie[ue]);var Ze="Sunday Monday Tuesday Wednesday Thursday Friday Saturday".split(" "),Ke="January February March April May June July August September October November December".split(" ");ie={"%a":d=>Ze[d.oa].substring(0,3),"%A":d=>Ze[d.oa],"%b":d=>Ke[d.wa].substring(0,3),"%B":d=>Ke[d.wa],"%C":d=>A((d.ua+1900)/100|0,2),"%d":d=>A(d.ya,2),"%e":d=>O(d.ya,2," "),"%g":d=>de(d).toString().substring(2),"%G":d=>de(d),"%H":d=>A(d.va,2),"%I":d=>(d=d.va,d==0?d=12:12<d&&(d-=12),A(d,2)),"%j":d=>{for(var B=0,$=0;$<=d.wa-1;B+=(Ae(d.ua+1900)?Ve:Je)[$++]);return A(d.ya+B,3)},"%m":d=>A(d.wa+1,2),"%M":d=>A(d.Ca,2),"%n":()=>`\n`,"%p":d=>0<=d.va&&12>d.va?"AM":"PM","%S":d=>A(d.Da,2),"%t":()=>"	","%u":d=>d.oa||7,"%U":d=>A(Math.floor((d.ta+7-d.oa)/7),2),"%V":d=>{var B=Math.floor((d.ta+7-(d.oa+6)%7)/7);if(2>=(d.oa+371-d.ta-2)%7&&B++,B)B==53&&($=(d.oa+371-d.ta)%7,$==4||$==3&&Ae(d.ua)||(B=1));else{B=52;var $=(d.oa+7-d.ta-1)%7;($==4||$==5&&Ae(d.ua%400-1))&&B++}return A(B,2)},"%w":d=>d.oa,"%W":d=>A(Math.floor((d.ta+7-(d.oa+6)%7)/7),2),"%y":d=>(d.ua+1900).toString().substring(2),"%Y":d=>d.ua+1900,"%z":d=>{d=d.Ba;var B=0<=d;return d=Math.abs(d)/60,(B?"+":"-")+("0000"+(d/60*100+d%60)).slice(-4)},"%Z":d=>d.Ea,"%%":()=>"%"},s=s.replace(/%%/g,"\\0\\0");for(ue in ie)s.includes(ue)&&(s=s.replace(new RegExp(ue,"g"),ie[ue](m)));return s=s.replace(/\\0\\0/g,"%"),ue=$e(s),ue.length>o?0:(se.set(ue,r>>>0),ue.length-1)}var G={a:function(r,o,s){throw r>>>=0,new Le(r).Aa(o>>>0,s>>>0),me=r,Se++,me},e:function(){return 0},H:function(){},x:function(){},z:function(){},J:function(){return 0},F:function(){},A:function(){},E:function(){},g:function(){},y:function(){},v:function(){},G:function(){},w:function(){},k:()=>1,n:function(r,o,s){r=o+2097152>>>0<4194305-!!r?(r>>>0)+4294967296*o:NaN,s>>>=0,r=new Date(1e3*r),S[s>>>2>>>0]=r.getUTCSeconds(),S[s+4>>>2>>>0]=r.getUTCMinutes(),S[s+8>>>2>>>0]=r.getUTCHours(),S[s+12>>>2>>>0]=r.getUTCDate(),S[s+16>>>2>>>0]=r.getUTCMonth(),S[s+20>>>2>>>0]=r.getUTCFullYear()-1900,S[s+24>>>2>>>0]=r.getUTCDay(),S[s+28>>>2>>>0]=(r.getTime()-Date.UTC(r.getUTCFullYear(),0,1,0,0,0,0))/864e5|0},o:function(r,o,s){r=o+2097152>>>0<4194305-!!r?(r>>>0)+4294967296*o:NaN,s>>>=0,r=new Date(1e3*r),S[s>>>2>>>0]=r.getSeconds(),S[s+4>>>2>>>0]=r.getMinutes(),S[s+8>>>2>>>0]=r.getHours(),S[s+12>>>2>>>0]=r.getDate(),S[s+16>>>2>>>0]=r.getMonth(),S[s+20>>>2>>>0]=r.getFullYear()-1900,S[s+24>>>2>>>0]=r.getDay(),S[s+28>>>2>>>0]=(Ae(r.getFullYear())?qe:at)[r.getMonth()]+r.getDate()-1|0,S[s+36>>>2>>>0]=-(60*r.getTimezoneOffset()),o=new Date(r.getFullYear(),6,1).getTimezoneOffset();var m=new Date(r.getFullYear(),0,1).getTimezoneOffset();S[s+32>>>2>>>0]=(o!=m&&r.getTimezoneOffset()==Math.min(m,o))|0},p:function(r){r>>>=0;var o=new Date(S[r+20>>>2>>>0]+1900,S[r+16>>>2>>>0],S[r+12>>>2>>>0],S[r+8>>>2>>>0],S[r+4>>>2>>>0],S[r>>>2>>>0],0),s=S[r+32>>>2>>>0],m=o.getTimezoneOffset(),O=new Date(o.getFullYear(),6,1).getTimezoneOffset(),A=new Date(o.getFullYear(),0,1).getTimezoneOffset(),L=Math.min(A,O);return 0>s?S[r+32>>>2>>>0]=+(O!=A&&L==m):0<s!=(L==m)&&(O=Math.max(A,O),o.setTime(o.getTime()+6e4*((0<s?L:O)-m))),S[r+24>>>2>>>0]=o.getDay(),S[r+28>>>2>>>0]=(Ae(o.getFullYear())?qe:at)[o.getMonth()]+o.getDate()-1|0,S[r>>>2>>>0]=o.getSeconds(),S[r+4>>>2>>>0]=o.getMinutes(),S[r+8>>>2>>>0]=o.getHours(),S[r+12>>>2>>>0]=o.getDate(),S[r+16>>>2>>>0]=o.getMonth(),S[r+20>>>2>>>0]=o.getYear(),r=o.getTime(),isNaN(r)?(S[je()>>>2>>>0]=61,r=-1):r/=1e3,Xe((be=r,1<=+Math.abs(be)?0<be?+Math.floor(be/4294967296)>>>0:~~+Math.ceil((be-+(~~be>>>0))/4294967296)>>>0:0)),r>>>0},l:function(){return-52},m:function(){},t:function(r,o,s){function m(de){return(de=de.toTimeString().match(/\\(([A-Za-z ]+)\\)$/))?de[1]:"GMT"}s>>>=0;var O=new Date().getFullYear(),A=new Date(O,0,1),L=new Date(O,6,1);O=A.getTimezoneOffset();var re=L.getTimezoneOffset();j[r>>>0>>>2>>>0]=60*Math.max(O,re),S[o>>>0>>>2>>>0]=+(O!=re),r=m(A),o=m(L),r=xe(r),o=xe(o),re<O?(j[s>>>2>>>0]=r,j[s+4>>>2>>>0]=o):(j[s>>>2>>>0]=o,j[s+4>>>2>>>0]=r)},d:()=>{F("")},B:function(r,o,s){r>>>=0,o>>>=0,s>>>=0,Ne.length=0;for(var m;m=ee[o++>>>0];){var O=m!=105;O&=m!=112,s+=O&&s%8?4:0,Ne.push(m==112?j[s>>>2>>>0]:m==105?S[s>>>2>>>0]:Ce[s>>>3>>>0]),s+=O?8:4}return we[r].apply(null,Ne)},h:()=>Date.now(),u:function(){return 4294901760},b:()=>performance.now(),I:function(r,o,s){return o>>>=0,ee.copyWithin(r>>>0>>>0,o>>>0,o+(s>>>0)>>>0)},s:function(r){r>>>=0;var o=ee.length;if(4294901760<r)return!1;for(var s=1;4>=s;s*=2){var m=o*(1+.2/s);m=Math.min(m,r+100663296);var O=Math;m=Math.max(r,m);e:{O=(O.min.call(O,4294901760,m+(65536-m%65536)%65536)-W.buffer.byteLength+65535)/65536;try{W.grow(O),Ue();var A=1;break e}catch{}A=void 0}if(A)return!0}return!1},C:function(r,o){r>>>=0,o>>>=0;var s=0;return He().forEach((m,O)=>{var A=o+s;for(O=j[r+4*O>>>2>>>0]=A,A=0;A<m.length;++A)se[O++>>>0>>>0]=m.charCodeAt(A);se[O>>>0>>>0]=0,s+=m.length+1}),0},D:function(r,o){r>>>=0,o>>>=0;var s=He();j[r>>>2>>>0]=s.length;var m=0;return s.forEach(O=>m+=O.length+1),j[o>>>2>>>0]=m,0},f:()=>52,j:function(){return 52},q:function(){return 70},i:function(r,o,s,m){o>>>=0,s>>>=0,m>>>=0;for(var O=0,A=0;A<s;A++){var L=j[o>>>2>>>0],re=j[o+4>>>2>>>0];o+=8;for(var de=0;de<re;de++){var ie=ee[L+de>>>0],ue=Be[r];ie===0||ie===10?((r===1?v:k)(te(ue,0)),ue.length=0):ue.push(ie)}O+=re}return j[m>>>2>>>0]=O,0},r:ot,c:function(r,o,s,m){return ot(r>>>0,o>>>0,s>>>0,m>>>0)}},C=function(){function r(s){return C=s.exports,C=ut(),W=C.K,Ue(),ne.unshift(C.L),Oe--,Oe==0&&(he!==null&&(clearInterval(he),he=null),ae&&(s=ae,ae=null,s())),C}var o={a:G};if(Oe++,a.instantiateWasm)try{return a.instantiateWasm(o,r)}catch(s){k(`Module.instantiateWasm callback failed with error: ${s}`),f(s)}return Ee(o,function(s){r(s.instance)}).catch(f),{}}();a._OrtInit=(r,o)=>(a._OrtInit=C.M)(r,o),a._OrtGetLastError=(r,o)=>(a._OrtGetLastError=C.N)(r,o),a._OrtCreateSessionOptions=(r,o,s,m,O,A,L,re,de,ie)=>(a._OrtCreateSessionOptions=C.O)(r,o,s,m,O,A,L,re,de,ie),a._OrtAppendExecutionProvider=(r,o)=>(a._OrtAppendExecutionProvider=C.P)(r,o),a._OrtAddFreeDimensionOverride=(r,o,s)=>(a._OrtAddFreeDimensionOverride=C.Q)(r,o,s),a._OrtAddSessionConfigEntry=(r,o,s)=>(a._OrtAddSessionConfigEntry=C.R)(r,o,s),a._OrtReleaseSessionOptions=r=>(a._OrtReleaseSessionOptions=C.S)(r),a._OrtCreateSession=(r,o,s)=>(a._OrtCreateSession=C.T)(r,o,s),a._OrtReleaseSession=r=>(a._OrtReleaseSession=C.U)(r),a._OrtGetInputOutputCount=(r,o,s)=>(a._OrtGetInputOutputCount=C.V)(r,o,s),a._OrtGetInputName=(r,o)=>(a._OrtGetInputName=C.W)(r,o),a._OrtGetOutputName=(r,o)=>(a._OrtGetOutputName=C.X)(r,o),a._OrtFree=r=>(a._OrtFree=C.Y)(r),a._OrtCreateTensor=(r,o,s,m,O,A)=>(a._OrtCreateTensor=C.Z)(r,o,s,m,O,A),a._OrtGetTensorData=(r,o,s,m,O)=>(a._OrtGetTensorData=C._)(r,o,s,m,O),a._OrtReleaseTensor=r=>(a._OrtReleaseTensor=C.$)(r),a._OrtCreateRunOptions=(r,o,s,m)=>(a._OrtCreateRunOptions=C.aa)(r,o,s,m),a._OrtAddRunConfigEntry=(r,o,s)=>(a._OrtAddRunConfigEntry=C.ba)(r,o,s),a._OrtReleaseRunOptions=r=>(a._OrtReleaseRunOptions=C.ca)(r),a._OrtCreateBinding=r=>(a._OrtCreateBinding=C.da)(r),a._OrtBindInput=(r,o,s)=>(a._OrtBindInput=C.ea)(r,o,s),a._OrtBindOutput=(r,o,s,m)=>(a._OrtBindOutput=C.fa)(r,o,s,m),a._OrtClearBoundOutputs=r=>(a._OrtClearBoundOutputs=C.ga)(r),a._OrtReleaseBinding=r=>(a._OrtReleaseBinding=C.ha)(r),a._OrtRunWithBinding=(r,o,s,m,O)=>(a._OrtRunWithBinding=C.ia)(r,o,s,m,O),a._OrtRun=(r,o,s,m,O,A,L,re)=>(a._OrtRun=C.ja)(r,o,s,m,O,A,L,re),a._OrtEndProfiling=r=>(a._OrtEndProfiling=C.ka)(r);var je=()=>(je=C.la)(),st=a._malloc=r=>(st=a._malloc=C.ma)(r);a._free=r=>(a._free=C.na)(r);var Xe=r=>(Xe=C.pa)(r),it=()=>(it=C.qa)(),M=r=>(M=C.ra)(r),ke=r=>(ke=C.sa)(r);function ut(){var r=C;r=Object.assign({},r);var o=m=>()=>m()>>>0,s=m=>O=>m(O)>>>0;return r.la=o(r.la),r.ma=s(r.ma),r.qa=o(r.qa),r.sa=s(r.sa),r}a.stackAlloc=ke,a.stackSave=it,a.stackRestore=M,a.UTF8ToString=z,a.stringToUTF8=(r,o,s)=>Fe(r,ee,o,s),a.lengthBytesUTF8=le;var Pe;ae=function r(){Pe||Qe(),Pe||(ae=r)};function Qe(){if(!(0<Oe)){if(a.preRun)for(typeof a.preRun=="function"&&(a.preRun=[a.preRun]);a.preRun.length;){var r=a.preRun.shift();ce.unshift(r)}for(;0<ce.length;)ce.shift()(a);if(!(0<Oe||Pe||(Pe=!0,a.calledRun=!0,H))){for(;0<ne.length;)ne.shift()(a);for(h(a);0<Q.length;)Q.shift()(a)}}}return Qe(),c.ready}})();typeof mr=="object"&&typeof Ft=="object"?Ft.exports=pr:typeof define=="function"&&define.amd&&define([],()=>pr)});var hr=tt(()=>{});var yr=tt(()=>{});var br={};At(br,{cpus:()=>rn});var rn,wr=St(()=>{rn=void 0});var _r=tt((vr,xt)=>{"use strict";var Or=(()=>{var u=typeof document<"u"&&document.currentScript?document.currentScript.src:void 0;return typeof __filename<"u"&&(u=u||__filename),function(c={}){function a(){return Q.buffer!=F.buffer&&Y(),F}function h(){return Q.buffer!=F.buffer&&Y(),ye}function f(){return Q.buffer!=F.buffer&&Y(),ve}function w(){return Q.buffer!=F.buffer&&Y(),fe}function g(){return Q.buffer!=F.buffer&&Y(),_e}var i=c,E,P;i.ready=new Promise((e,t)=>{E=e,P=t});var U=Object.assign({},i),D="./this.program",x=(e,t)=>{throw t},K=typeof window=="object",R=typeof importScripts=="function",I=typeof process=="object"&&typeof process.versions=="object"&&typeof process.versions.node=="string",v=i.ENVIRONMENT_IS_PTHREAD||!1,k="";function W(e){return i.locateFile?i.locateFile(e,k):k+e}var H,se,ee;if(I){var S=(Mt(),rt(Tt)),j=(Dt(),rt(Ct));k=R?j.dirname(k)+"/":__dirname+"/",H=(t,n)=>(t=z(t)?new URL(t):j.normalize(t),S.readFileSync(t,n?void 0:"utf8")),ee=t=>(t=H(t,!0),t.buffer||(t=new Uint8Array(t)),t),se=(t,n,l,y=!0)=>{t=z(t)?new URL(t):j.normalize(t),S.readFile(t,y?void 0:"utf8",(b,_)=>{b?l(b):n(y?_.buffer:_)})},!i.thisProgram&&1<process.argv.length&&(D=process.argv[1].replace(/\\\\/g,"/")),process.argv.slice(2),x=(t,n)=>{throw process.exitCode=t,n},i.inspect=()=>"[Emscripten Module object]";let e;try{e=hr()}catch(t){throw console.error(\'The "worker_threads" module is not supported in this node.js build - perhaps a newer version is needed?\'),t}global.Worker=e.Worker}else(K||R)&&(R?k=self.location.href:typeof document<"u"&&document.currentScript&&(k=document.currentScript.src),typeof u<"u"&&u&&(k=u),k.indexOf("blob:")!==0?k=k.substr(0,k.replace(/[?#].*/,"").lastIndexOf("/")+1):k="",I||(H=e=>{var t=new XMLHttpRequest;return t.open("GET",e,!1),t.send(null),t.responseText},R&&(ee=e=>{var t=new XMLHttpRequest;return t.open("GET",e,!1),t.responseType="arraybuffer",t.send(null),new Uint8Array(t.response)}),se=(e,t,n)=>{var l=new XMLHttpRequest;l.open("GET",e,!0),l.responseType="arraybuffer",l.onload=()=>{l.status==200||l.status==0&&l.response?t(l.response):n()},l.onerror=n,l.send(null)}));I&&typeof performance>"u"&&(global.performance=yr().performance);var Ce=console.log.bind(console),Ue=console.error.bind(console);I&&(Ce=(...e)=>S.writeSync(1,e.join(" ")+`\n`),Ue=(...e)=>S.writeSync(2,e.join(" ")+`\n`));var ce=Ce,ne=Ue;Object.assign(i,U),U=null,typeof WebAssembly!="object"&&De("no native wasm support detected");var Q,Oe,he=!1,ae,F,ye,ve,fe,_e;function Y(){var e=Q.buffer;i.HEAP8=F=new Int8Array(e),i.HEAP16=new Int16Array(e),i.HEAPU8=ye=new Uint8Array(e),i.HEAPU16=new Uint16Array(e),i.HEAP32=ve=new Int32Array(e),i.HEAPU32=fe=new Uint32Array(e),i.HEAPF32=new Float32Array(e),i.HEAPF64=_e=new Float64Array(e)}var pe=16777216;if(v)Q=i.wasmMemory;else if(i.wasmMemory)Q=i.wasmMemory;else if(Q=new WebAssembly.Memory({initial:pe/65536,maximum:65536,shared:!0}),!(Q.buffer instanceof SharedArrayBuffer))throw ne("requested a shared WebAssembly.Memory but the returned buffer is not a SharedArrayBuffer, indicating that while the browser has SharedArrayBuffer it does not have WebAssembly threads support - you may need to set a flag"),I&&ne("(on node you may need: --experimental-wasm-threads --experimental-wasm-bulk-memory and/or recent version)"),Error("bad memory");Y(),pe=Q.buffer.byteLength;var Ie=[],Ee=[],be=[],we=0,Le=null,me=null;function Se(){if(we--,we==0&&(Le!==null&&(clearInterval(Le),Le=null),me)){var e=me;me=null,e()}}function De(e){throw e="Aborted("+e+")",ne(e),he=!0,ae=1,e=new WebAssembly.RuntimeError(e+". Build with -sASSERTIONS for more info."),P(e),e}var te=e=>e.startsWith("data:application/octet-stream;base64,"),z=e=>e.startsWith("file://"),le;le="ort-wasm-threaded.wasm",te(le)||(le=W(le));function Fe(e){if(ee)return ee(e);throw"both async and sync fetching of the wasm failed"}function Ae(e){if(K||R){if(typeof fetch=="function"&&!z(e))return fetch(e,{credentials:"same-origin"}).then(t=>{if(!t.ok)throw"failed to load wasm binary file at \'"+e+"\'";return t.arrayBuffer()}).catch(()=>Fe(e));if(se)return new Promise((t,n)=>{se(e,l=>t(new Uint8Array(l)),n)})}return Promise.resolve().then(()=>Fe(e))}function qe(e,t,n){return Ae(e).then(l=>WebAssembly.instantiate(l,t)).then(l=>l).then(n,l=>{ne(`failed to asynchronously prepare wasm: ${l}`),De(l)})}function at(e,t){var n=le;return typeof WebAssembly.instantiateStreaming!="function"||te(n)||z(n)||I||typeof fetch!="function"?qe(n,e,t):fetch(n,{credentials:"same-origin"}).then(l=>WebAssembly.instantiateStreaming(l,e).then(t,function(y){return ne(`wasm streaming compile failed: ${y}`),ne("falling back to ArrayBuffer instantiation"),qe(n,e,t)}))}var xe,Ne={921388:(e,t,n,l)=>{if(typeof i>"u"||!i.cb)return 1;if(e=$e(e>>>0),e.startsWith("./")&&(e=e.substring(2)),e=i.cb.get(e),!e)return 2;if(t>>>=0,n>>>=0,l>>>=0,t+n>e.byteLength)return 3;try{return h().set(e.subarray(t,t+n),l>>>0),0}catch{return 4}}};function Re(e){this.name="ExitStatus",this.message=`Program terminated with exit(${e})`,this.status=e}var He=e=>{e.terminate(),e.onmessage=()=>{}},Ge=e=>{M.Pa.length==0&&(Xe(),M.Ya(M.Pa[0]));var t=M.Pa.pop();if(!t)return 6;M.Qa.push(t),M.Ma[e.Oa]=t,t.Oa=e.Oa;var n={cmd:"run",start_routine:e.kb,arg:e.hb,pthread_ptr:e.Oa};return I&&t.unref(),t.postMessage(n,e.qb),0},Be=0,Ve=typeof TextDecoder<"u"?new TextDecoder("utf8"):void 0,Je=(e,t,n)=>{t>>>=0;var l=t+n;for(n=t;e[n]&&!(n>=l);)++n;if(16<n-t&&e.buffer&&Ve)return Ve.decode(e.buffer instanceof SharedArrayBuffer?e.slice(t,n):e.subarray(t,n));for(l="";t<n;){var y=e[t++];if(y&128){var b=e[t++]&63;if((y&224)==192)l+=String.fromCharCode((y&31)<<6|b);else{var _=e[t++]&63;y=(y&240)==224?(y&15)<<12|b<<6|_:(y&7)<<18|b<<12|_<<6|e[t++]&63,65536>y?l+=String.fromCharCode(y):(y-=65536,l+=String.fromCharCode(55296|y>>10,56320|y&1023))}}else l+=String.fromCharCode(y)}return l},$e=(e,t)=>(e>>>=0)?Je(h(),e,t):"",ot=e=>{var t=vt();return e=e(),ct(t),e};function G(e,t){var n=arguments.length-2,l=arguments;return ot(()=>{for(var y=_t(8*n),b=y>>>3,_=0;_<n;_++){var J=l[2+_];g()[b+_>>>0]=J}return ar(e,n,y,t)})}function C(e){if(v)return G(0,1,e);ae=e,0<Be||(M.lb(),i.onExit?.(e),he=!0),x(e,new Re(e))}var je=e=>{if(ae=e,v)throw ut(e),"unwind";C(e)};function st(){for(var e=i.numThreads;e--;)Xe();Ie.unshift(()=>{we++,it(()=>Se())})}function Xe(){var e=W("ort-wasm-threaded.worker.js");e=new Worker(e),M.Pa.push(e)}function it(e){v?e():Promise.all(M.Pa.map(M.Ya)).then(e)}var M={Pa:[],Qa:[],bb:[],Ma:{},Wa(){v?(M.receiveObjectTransfer=M.jb,M.threadInitTLS=M.ab,M.setExitStatus=M.$a):st()},$a:e=>ae=e,tb:["$terminateWorker"],lb:()=>{for(var e of M.Qa)He(e);for(e of M.Pa)He(e);M.Pa=[],M.Qa=[],M.Ma=[]},Za:e=>{var t=e.Oa;delete M.Ma[t],M.Pa.push(e),M.Qa.splice(M.Qa.indexOf(e),1),e.Oa=0,wt(t)},jb(){},ab(){M.bb.forEach(e=>e())},Ya:e=>new Promise(t=>{e.onmessage=b=>{b=b.data;var _=b.cmd;if(b.targetThread&&b.targetThread!=lt()){var J=M.Ma[b.targetThread];J?J.postMessage(b,b.transferList):ne(`Internal error! Worker sent a message "${_}" to target pthread ${b.targetThread}, but that thread no longer exists!`)}else _==="checkMailbox"?ft():_==="spawnThread"?Ge(b):_==="cleanupThread"?M.Za(M.Ma[b.thread]):_==="killThread"?(b=b.thread,_=M.Ma[b],delete M.Ma[b],He(_),wt(b),M.Qa.splice(M.Qa.indexOf(_),1),_.Oa=0):_==="cancelThread"?M.Ma[b.thread].postMessage({cmd:"cancel"}):_==="loaded"?(e.loaded=!0,I&&!e.Oa&&e.unref(),t(e)):_==="alert"?alert(`Thread ${b.threadId}: ${b.text}`):b.target==="setimmediate"?e.postMessage(b):_==="callHandler"?i[b.handler](...b.args):_&&ne(`worker sent an unknown command ${_}`)},e.onerror=b=>{throw ne(`worker sent an error! ${b.filename}:${b.lineno}: ${b.message}`),b},I&&(e.on("message",b=>e.onmessage({data:b})),e.on("error",b=>e.onerror(b)));var n=[],l=["onExit"],y;for(y of l)i.hasOwnProperty(y)&&n.push(y);e.postMessage({cmd:"load",handlers:n,urlOrBlob:i.mainScriptUrlOrBlob||u,wasmMemory:Q,wasmModule:Oe})})};i.PThread=M;var ke=e=>{for(;0<e.length;)e.shift()(i)};i.establishStackSpace=()=>{var e=lt(),t=w()[e+52>>>2>>>0];e=w()[e+56>>>2>>>0],ir(t,t-e),ct(t)};function ut(e){if(v)return G(1,0,e);je(e)}var Pe=[],Qe;i.invokeEntryPoint=(e,t)=>{var n=Pe[e];n||(e>=Pe.length&&(Pe.length=e+1),Pe[e]=n=Qe.get(e)),e=n(t),0<Be?M.$a(e):Ot(e)};function r(e){this.Va=e-24,this.gb=function(t){w()[this.Va+4>>>2>>>0]=t},this.fb=function(t){w()[this.Va+8>>>2>>>0]=t},this.Wa=function(t,n){this.eb(),this.gb(t),this.fb(n)},this.eb=function(){w()[this.Va+16>>>2>>>0]=0}}var o=0,s=0;function m(e,t,n,l){return v?G(2,1,e,t,n,l):O(e,t,n,l)}function O(e,t,n,l){if(e>>>=0,t>>>=0,n>>>=0,l>>>=0,typeof SharedArrayBuffer>"u")return ne("Current environment does not support SharedArrayBuffer, pthreads are not available!"),6;var y=[];return v&&y.length===0?m(e,t,n,l):(e={kb:n,Oa:e,hb:l,qb:y},v?(e.sb="spawnThread",postMessage(e,y),0):Ge(e))}function A(e,t,n){return v?G(3,1,e,t,n):0}function L(e,t){if(v)return G(4,1,e,t)}var re=e=>{for(var t=0,n=0;n<e.length;++n){var l=e.charCodeAt(n);127>=l?t++:2047>=l?t+=2:55296<=l&&57343>=l?(t+=4,++n):t+=3}return t},de=(e,t,n,l)=>{if(n>>>=0,!(0<l))return 0;var y=n;l=n+l-1;for(var b=0;b<e.length;++b){var _=e.charCodeAt(b);if(55296<=_&&57343>=_){var J=e.charCodeAt(++b);_=65536+((_&1023)<<10)|J&1023}if(127>=_){if(n>=l)break;t[n++>>>0]=_}else{if(2047>=_){if(n+1>=l)break;t[n++>>>0]=192|_>>6}else{if(65535>=_){if(n+2>=l)break;t[n++>>>0]=224|_>>12}else{if(n+3>=l)break;t[n++>>>0]=240|_>>18,t[n++>>>0]=128|_>>12&63}t[n++>>>0]=128|_>>6&63}t[n++>>>0]=128|_&63}}return t[n>>>0]=0,n-y},ie=(e,t,n)=>de(e,h(),t,n);function ue(e,t){if(v)return G(5,1,e,t)}function Ze(e,t,n){if(v)return G(6,1,e,t,n)}function Ke(e,t,n){return v?G(7,1,e,t,n):0}function d(e,t){if(v)return G(8,1,e,t)}function B(e,t,n){if(v)return G(9,1,e,t,n)}function $(e,t,n,l){if(v)return G(10,1,e,t,n,l)}function Te(e,t,n,l){if(v)return G(11,1,e,t,n,l)}function et(e,t,n,l){if(v)return G(12,1,e,t,n,l)}function Bt(e){if(v)return G(13,1,e)}function kt(e,t){if(v)return G(14,1,e,t)}function Wt(e,t,n){if(v)return G(15,1,e,t,n)}function mt(e){e>>>=0,typeof Atomics.rb=="function"&&(Atomics.rb(f(),e>>>2,e).value.then(ft),e+=128,Atomics.store(f(),e>>>2,1))}i.__emscripten_thread_mailbox_await=mt;var ft=()=>{var e=lt();if(e&&(mt(e),e=or,!he))try{if(e(),!(0<Be))try{v?Ot(ae):je(ae)}catch(t){t instanceof Re||t=="unwind"||x(1,t)}}catch(t){t instanceof Re||t=="unwind"||x(1,t)}};i.checkMailbox=ft;var gt=[],Ye=e=>e%4===0&&(e%100!==0||e%400===0),Nt=[0,31,60,91,121,152,182,213,244,274,305,335],Ht=[0,31,59,90,120,151,181,212,243,273,304,334];function Gt(e,t,n,l,y,b,_,J){return v?G(16,1,e,t,n,l,y,b,_,J):-52}function $t(e,t,n,l,y,b,_){if(v)return G(17,1,e,t,n,l,y,b,_)}var jt=e=>{var t=re(e)+1,n=rr(t);return n&&ie(e,n,t),n},ht=[],yt={},Yt=()=>{if(!bt){var e={USER:"web_user",LOGNAME:"web_user",PATH:"/",PWD:"/",HOME:"/home/web_user",LANG:(typeof navigator=="object"&&navigator.languages&&navigator.languages[0]||"C").replace("-","_")+".UTF-8",_:D||"./this.program"},t;for(t in yt)yt[t]===void 0?delete e[t]:e[t]=yt[t];var n=[];for(t in e)n.push(`${t}=${e[t]}`);bt=n}return bt},bt;function zt(e,t){if(v)return G(18,1,e,t);e>>>=0,t>>>=0;var n=0;return Yt().forEach((l,y)=>{var b=t+n;for(y=w()[e+4*y>>>2>>>0]=b,b=0;b<l.length;++b)a()[y++>>>0>>>0]=l.charCodeAt(b);a()[y>>>0>>>0]=0,n+=l.length+1}),0}function qt(e,t){if(v)return G(19,1,e,t);e>>>=0,t>>>=0;var n=Yt();w()[e>>>2>>>0]=n.length;var l=0;return n.forEach(y=>l+=y.length+1),w()[t>>>2>>>0]=l,0}function Vt(e){return v?G(20,1,e):52}function Jt(e,t,n,l){return v?G(21,1,e,t,n,l):52}function Xt(e,t,n,l,y){return v?G(22,1,e,t,n,l,y):70}var $r=[null,[],[]];function Qt(e,t,n,l){if(v)return G(23,1,e,t,n,l);t>>>=0,n>>>=0,l>>>=0;for(var y=0,b=0;b<n;b++){var _=w()[t>>>2>>>0],J=w()[t+4>>>2>>>0];t+=8;for(var Me=0;Me<J;Me++){var oe=h()[_+Me>>>0],ge=$r[e];oe===0||oe===10?((e===1?ce:ne)(Je(ge,0)),ge.length=0):ge.push(oe)}y+=J}return w()[l>>>2>>>0]=y,0}var Zt=[31,29,31,30,31,30,31,31,30,31,30,31],Kt=[31,28,31,30,31,30,31,31,30,31,30,31];function jr(e){var t=Array(re(e)+1);return de(e,t,0,t.length),t}var Yr=(e,t)=>{a().set(e,t>>>0)};function er(e,t,n,l){function y(p,N,X){for(p=typeof p=="number"?p.toString():p||"";p.length<N;)p=X[0]+p;return p}function b(p,N){return y(p,N,"0")}function _(p,N){function X(cr){return 0>cr?-1:0<cr?1:0}var We;return(We=X(p.getFullYear()-N.getFullYear()))===0&&(We=X(p.getMonth()-N.getMonth()))===0&&(We=X(p.getDate()-N.getDate())),We}function J(p){switch(p.getDay()){case 0:return new Date(p.getFullYear()-1,11,29);case 1:return p;case 2:return new Date(p.getFullYear(),0,3);case 3:return new Date(p.getFullYear(),0,2);case 4:return new Date(p.getFullYear(),0,1);case 5:return new Date(p.getFullYear()-1,11,31);case 6:return new Date(p.getFullYear()-1,11,30)}}function Me(p){var N=p.Ra;for(p=new Date(new Date(p.Sa+1900,0,1).getTime());0<N;){var X=p.getMonth(),We=(Ye(p.getFullYear())?Zt:Kt)[X];if(N>We-p.getDate())N-=We-p.getDate()+1,p.setDate(1),11>X?p.setMonth(X+1):(p.setMonth(0),p.setFullYear(p.getFullYear()+1));else{p.setDate(p.getDate()+N);break}}return X=new Date(p.getFullYear()+1,0,4),N=J(new Date(p.getFullYear(),0,4)),X=J(X),0>=_(N,p)?0>=_(X,p)?p.getFullYear()+1:p.getFullYear():p.getFullYear()-1}e>>>=0,t>>>=0,n>>>=0,l>>>=0;var oe=w()[l+40>>>2>>>0];l={ob:f()[l>>>2>>>0],nb:f()[l+4>>>2>>>0],Ta:f()[l+8>>>2>>>0],Xa:f()[l+12>>>2>>>0],Ua:f()[l+16>>>2>>>0],Sa:f()[l+20>>>2>>>0],Na:f()[l+24>>>2>>>0],Ra:f()[l+28>>>2>>>0],ub:f()[l+32>>>2>>>0],mb:f()[l+36>>>2>>>0],pb:oe?$e(oe):""},n=$e(n),oe={"%c":"%a %b %d %H:%M:%S %Y","%D":"%m/%d/%y","%F":"%Y-%m-%d","%h":"%b","%r":"%I:%M:%S %p","%R":"%H:%M","%T":"%H:%M:%S","%x":"%m/%d/%y","%X":"%H:%M:%S","%Ec":"%c","%EC":"%C","%Ex":"%m/%d/%y","%EX":"%H:%M:%S","%Ey":"%y","%EY":"%Y","%Od":"%d","%Oe":"%e","%OH":"%H","%OI":"%I","%Om":"%m","%OM":"%M","%OS":"%S","%Ou":"%u","%OU":"%U","%OV":"%V","%Ow":"%w","%OW":"%W","%Oy":"%y"};for(var ge in oe)n=n.replace(new RegExp(ge,"g"),oe[ge]);var fr="Sunday Monday Tuesday Wednesday Thursday Friday Saturday".split(" "),lr="January February March April May June July August September October November December".split(" ");oe={"%a":p=>fr[p.Na].substring(0,3),"%A":p=>fr[p.Na],"%b":p=>lr[p.Ua].substring(0,3),"%B":p=>lr[p.Ua],"%C":p=>b((p.Sa+1900)/100|0,2),"%d":p=>b(p.Xa,2),"%e":p=>y(p.Xa,2," "),"%g":p=>Me(p).toString().substring(2),"%G":p=>Me(p),"%H":p=>b(p.Ta,2),"%I":p=>(p=p.Ta,p==0?p=12:12<p&&(p-=12),b(p,2)),"%j":p=>{for(var N=0,X=0;X<=p.Ua-1;N+=(Ye(p.Sa+1900)?Zt:Kt)[X++]);return b(p.Xa+N,3)},"%m":p=>b(p.Ua+1,2),"%M":p=>b(p.nb,2),"%n":()=>`\n`,"%p":p=>0<=p.Ta&&12>p.Ta?"AM":"PM","%S":p=>b(p.ob,2),"%t":()=>"	","%u":p=>p.Na||7,"%U":p=>b(Math.floor((p.Ra+7-p.Na)/7),2),"%V":p=>{var N=Math.floor((p.Ra+7-(p.Na+6)%7)/7);if(2>=(p.Na+371-p.Ra-2)%7&&N++,N)N==53&&(X=(p.Na+371-p.Ra)%7,X==4||X==3&&Ye(p.Sa)||(N=1));else{N=52;var X=(p.Na+7-p.Ra-1)%7;(X==4||X==5&&Ye(p.Sa%400-1))&&N++}return b(N,2)},"%w":p=>p.Na,"%W":p=>b(Math.floor((p.Ra+7-(p.Na+6)%7)/7),2),"%y":p=>(p.Sa+1900).toString().substring(2),"%Y":p=>p.Sa+1900,"%z":p=>{p=p.mb;var N=0<=p;return p=Math.abs(p)/60,(N?"+":"-")+("0000"+(p/60*100+p%60)).slice(-4)},"%Z":p=>p.pb,"%%":()=>"%"},n=n.replace(/%%/g,"\\0\\0");for(ge in oe)n.includes(ge)&&(n=n.replace(new RegExp(ge,"g"),oe[ge](l)));return n=n.replace(/\\0\\0/g,"%"),ge=jr(n),ge.length>t?0:(Yr(ge,e),ge.length-1)}M.Wa();var zr=[C,ut,m,A,L,ue,Ze,Ke,d,B,$,Te,et,Bt,kt,Wt,Gt,$t,zt,qt,Vt,Jt,Xt,Qt],qr={b:function(e,t,n){throw e>>>=0,new r(e).Wa(t>>>0,n>>>0),o=e,s++,o},L:function(e){nr(e>>>0,!R,1,!K,131072,!1),M.ab()},j:function(e){e>>>=0,v?postMessage({cmd:"cleanupThread",thread:e}):M.Za(M.Ma[e])},H:O,h:A,S:L,D:ue,F:Ze,T:Ke,Q:d,J:B,P:$,n:Te,E:et,B:Bt,R:kt,C:Wt,p:()=>1,z:function(e,t){e>>>=0,e==t>>>0?setTimeout(()=>ft()):v?postMessage({targetThread:e,cmd:"checkMailbox"}):(e=M.Ma[e])&&e.postMessage({cmd:"checkMailbox"})},I:function(e,t,n,l){t>>>=0,gt.length=n,l=l>>>0>>>3;for(var y=0;y<n;y++)gt[y]=g()[l+y>>>0];return e=0>e?Ne[-e-1]:zr[e],M.ib=t,t=e.apply(null,gt),M.ib=0,t},K:mt,o:function(e){I&&M.Ma[e>>>0].ref()},s:function(e,t,n){e=t+2097152>>>0<4194305-!!e?(e>>>0)+4294967296*t:NaN,n>>>=0,e=new Date(1e3*e),f()[n>>>2>>>0]=e.getUTCSeconds(),f()[n+4>>>2>>>0]=e.getUTCMinutes(),f()[n+8>>>2>>>0]=e.getUTCHours(),f()[n+12>>>2>>>0]=e.getUTCDate(),f()[n+16>>>2>>>0]=e.getUTCMonth(),f()[n+20>>>2>>>0]=e.getUTCFullYear()-1900,f()[n+24>>>2>>>0]=e.getUTCDay(),e=(e.getTime()-Date.UTC(e.getUTCFullYear(),0,1,0,0,0,0))/864e5|0,f()[n+28>>>2>>>0]=e},t:function(e,t,n){e=t+2097152>>>0<4194305-!!e?(e>>>0)+4294967296*t:NaN,n>>>=0,e=new Date(1e3*e),f()[n>>>2>>>0]=e.getSeconds(),f()[n+4>>>2>>>0]=e.getMinutes(),f()[n+8>>>2>>>0]=e.getHours(),f()[n+12>>>2>>>0]=e.getDate(),f()[n+16>>>2>>>0]=e.getMonth(),f()[n+20>>>2>>>0]=e.getFullYear()-1900,f()[n+24>>>2>>>0]=e.getDay(),t=(Ye(e.getFullYear())?Nt:Ht)[e.getMonth()]+e.getDate()-1|0,f()[n+28>>>2>>>0]=t,f()[n+36>>>2>>>0]=-(60*e.getTimezoneOffset()),t=new Date(e.getFullYear(),6,1).getTimezoneOffset();var l=new Date(e.getFullYear(),0,1).getTimezoneOffset();e=(t!=l&&e.getTimezoneOffset()==Math.min(l,t))|0,f()[n+32>>>2>>>0]=e},u:function(e){e>>>=0;var t=new Date(f()[e+20>>>2>>>0]+1900,f()[e+16>>>2>>>0],f()[e+12>>>2>>>0],f()[e+8>>>2>>>0],f()[e+4>>>2>>>0],f()[e>>>2>>>0],0),n=f()[e+32>>>2>>>0],l=t.getTimezoneOffset(),y=new Date(t.getFullYear(),6,1).getTimezoneOffset(),b=new Date(t.getFullYear(),0,1).getTimezoneOffset(),_=Math.min(b,y);return 0>n?f()[e+32>>>2>>>0]=+(y!=b&&_==l):0<n!=(_==l)&&(y=Math.max(b,y),t.setTime(t.getTime()+6e4*((0<n?_:y)-l))),f()[e+24>>>2>>>0]=t.getDay(),n=(Ye(t.getFullYear())?Nt:Ht)[t.getMonth()]+t.getDate()-1|0,f()[e+28>>>2>>>0]=n,f()[e>>>2>>>0]=t.getSeconds(),f()[e+4>>>2>>>0]=t.getMinutes(),f()[e+8>>>2>>>0]=t.getHours(),f()[e+12>>>2>>>0]=t.getDate(),f()[e+16>>>2>>>0]=t.getMonth(),f()[e+20>>>2>>>0]=t.getYear(),e=t.getTime(),isNaN(e)?(f()[tr()>>>2>>>0]=61,e=-1):e/=1e3,sr((xe=e,1<=+Math.abs(xe)?0<xe?+Math.floor(xe/4294967296)>>>0:~~+Math.ceil((xe-+(~~xe>>>0))/4294967296)>>>0:0)),e>>>0},q:Gt,r:$t,y:function(e,t,n){function l(oe){return(oe=oe.toTimeString().match(/\\(([A-Za-z ]+)\\)$/))?oe[1]:"GMT"}e>>>=0,t>>>=0,n>>>=0;var y=new Date().getFullYear(),b=new Date(y,0,1),_=new Date(y,6,1);y=b.getTimezoneOffset();var J=_.getTimezoneOffset(),Me=Math.max(y,J);w()[e>>>2>>>0]=60*Me,f()[t>>>2>>>0]=+(y!=J),e=l(b),t=l(_),e=jt(e),t=jt(t),J<y?(w()[n>>>2>>>0]=e,w()[n+4>>>2>>>0]=t):(w()[n>>>2>>>0]=t,w()[n+4>>>2>>>0]=e)},c:()=>{De("")},O:function(e,t,n){e>>>=0,t>>>=0,n>>>=0,ht.length=0;for(var l;l=h()[t++>>>0];){var y=l!=105;y&=l!=112,n+=y&&n%8?4:0,ht.push(l==112?w()[n>>>2>>>0]:l==105?f()[n>>>2>>>0]:g()[n>>>3>>>0]),n+=y?8:4}return Ne[e].apply(null,ht)},k:()=>{},i:()=>Date.now(),U:()=>{throw Be+=1,"unwind"},A:function(){return 4294901760},e:()=>performance.timeOrigin+performance.now(),f:()=>I?(wr(),rt(br)).cpus().length:navigator.hardwareConcurrency,x:function(e){e>>>=0;var t=h().length;if(e<=t||4294901760<e)return!1;for(var n=1;4>=n;n*=2){var l=t*(1+.2/n);l=Math.min(l,e+100663296);var y=Math;l=Math.max(e,l);e:{y=(y.min.call(y,4294901760,l+(65536-l%65536)%65536)-Q.buffer.byteLength+65535)/65536;try{Q.grow(y),Y();var b=1;break e}catch{}b=void 0}if(b)return!0}return!1},M:zt,N:qt,G:je,g:Vt,m:Jt,v:Xt,l:Qt,a:Q||i.wasmMemory,w:er,d:function(e,t,n,l){return er(e>>>0,t>>>0,n>>>0,l>>>0)}},T=function(){function e(n,l){return T=n.exports,T=Vr(),M.bb.push(T.za),Qe=T.Aa,Ee.unshift(T.V),Oe=l,Se(),T}var t={a:qr};if(we++,i.instantiateWasm)try{return i.instantiateWasm(t,e)}catch(n){ne(`Module.instantiateWasm callback failed with error: ${n}`),P(n)}return at(t,function(n){e(n.instance,n.module)}).catch(P),{}}();i._OrtInit=(e,t)=>(i._OrtInit=T.W)(e,t),i._OrtGetLastError=(e,t)=>(i._OrtGetLastError=T.X)(e,t),i._OrtCreateSessionOptions=(e,t,n,l,y,b,_,J,Me,oe)=>(i._OrtCreateSessionOptions=T.Y)(e,t,n,l,y,b,_,J,Me,oe),i._OrtAppendExecutionProvider=(e,t)=>(i._OrtAppendExecutionProvider=T.Z)(e,t),i._OrtAddFreeDimensionOverride=(e,t,n)=>(i._OrtAddFreeDimensionOverride=T._)(e,t,n),i._OrtAddSessionConfigEntry=(e,t,n)=>(i._OrtAddSessionConfigEntry=T.$)(e,t,n),i._OrtReleaseSessionOptions=e=>(i._OrtReleaseSessionOptions=T.aa)(e),i._OrtCreateSession=(e,t,n)=>(i._OrtCreateSession=T.ba)(e,t,n),i._OrtReleaseSession=e=>(i._OrtReleaseSession=T.ca)(e),i._OrtGetInputOutputCount=(e,t,n)=>(i._OrtGetInputOutputCount=T.da)(e,t,n),i._OrtGetInputName=(e,t)=>(i._OrtGetInputName=T.ea)(e,t),i._OrtGetOutputName=(e,t)=>(i._OrtGetOutputName=T.fa)(e,t),i._OrtFree=e=>(i._OrtFree=T.ga)(e),i._OrtCreateTensor=(e,t,n,l,y,b)=>(i._OrtCreateTensor=T.ha)(e,t,n,l,y,b),i._OrtGetTensorData=(e,t,n,l,y)=>(i._OrtGetTensorData=T.ia)(e,t,n,l,y),i._OrtReleaseTensor=e=>(i._OrtReleaseTensor=T.ja)(e),i._OrtCreateRunOptions=(e,t,n,l)=>(i._OrtCreateRunOptions=T.ka)(e,t,n,l),i._OrtAddRunConfigEntry=(e,t,n)=>(i._OrtAddRunConfigEntry=T.la)(e,t,n),i._OrtReleaseRunOptions=e=>(i._OrtReleaseRunOptions=T.ma)(e),i._OrtCreateBinding=e=>(i._OrtCreateBinding=T.na)(e),i._OrtBindInput=(e,t,n)=>(i._OrtBindInput=T.oa)(e,t,n),i._OrtBindOutput=(e,t,n,l)=>(i._OrtBindOutput=T.pa)(e,t,n,l),i._OrtClearBoundOutputs=e=>(i._OrtClearBoundOutputs=T.qa)(e),i._OrtReleaseBinding=e=>(i._OrtReleaseBinding=T.ra)(e),i._OrtRunWithBinding=(e,t,n,l,y)=>(i._OrtRunWithBinding=T.sa)(e,t,n,l,y),i._OrtRun=(e,t,n,l,y,b,_,J)=>(i._OrtRun=T.ta)(e,t,n,l,y,b,_,J),i._OrtEndProfiling=e=>(i._OrtEndProfiling=T.ua)(e);var tr=()=>(tr=T.va)(),lt=i._pthread_self=()=>(lt=i._pthread_self=T.wa)(),rr=i._malloc=e=>(rr=i._malloc=T.xa)(e);i._free=e=>(i._free=T.ya)(e),i.__emscripten_tls_init=()=>(i.__emscripten_tls_init=T.za)();var nr=i.__emscripten_thread_init=(e,t,n,l,y,b)=>(nr=i.__emscripten_thread_init=T.Ba)(e,t,n,l,y,b);i.__emscripten_thread_crashed=()=>(i.__emscripten_thread_crashed=T.Ca)();var ar=(e,t,n,l)=>(ar=T.Da)(e,t,n,l),wt=e=>(wt=T.Ea)(e),Ot=i.__emscripten_thread_exit=e=>(Ot=i.__emscripten_thread_exit=T.Fa)(e),or=()=>(or=T.Ga)(),sr=e=>(sr=T.Ha)(e),ir=(e,t)=>(ir=T.Ia)(e,t),vt=()=>(vt=T.Ja)(),ct=e=>(ct=T.Ka)(e),_t=e=>(_t=T.La)(e);function Vr(){var e=T;e=Object.assign({},e);var t=l=>()=>l()>>>0,n=l=>y=>l(y)>>>0;return e.va=t(e.va),e.wa=t(e.wa),e.xa=n(e.xa),e.emscripten_main_runtime_thread_id=t(e.emscripten_main_runtime_thread_id),e.Ja=t(e.Ja),e.La=n(e.La),e}i.wasmMemory=Q,i.stackAlloc=_t,i.stackSave=vt,i.stackRestore=ct,i.keepRuntimeAlive=()=>0<Be,i.UTF8ToString=$e,i.stringToUTF8=ie,i.lengthBytesUTF8=re,i.ExitStatus=Re,i.PThread=M;var dt;me=function e(){dt||ur(),dt||(me=e)};function ur(){if(!(0<we))if(v)E(i),v||ke(Ee),startWorker(i);else{if(i.preRun)for(typeof i.preRun=="function"&&(i.preRun=[i.preRun]);i.preRun.length;)Ie.unshift(i.preRun.shift());ke(Ie),0<we||dt||(dt=!0,i.calledRun=!0,he||(v||ke(Ee),E(i),v||ke(be)))}}return ur(),c.ready}})();typeof vr=="object"&&typeof xt=="object"?xt.exports=Or:typeof define=="function"&&define.amd&&define([],()=>Or)});var Er=tt((On,nn)=>{nn.exports=\'"use strict";var Module={},ENVIRONMENT_IS_NODE=typeof process=="object"&&typeof process.versions=="object"&&typeof process.versions.node=="string";if(ENVIRONMENT_IS_NODE){var nodeWorkerThreads=require("worker_threads"),parentPort=nodeWorkerThreads.parentPort;parentPort.on("message",e=>onmessage({data:e}));var fs=require("fs"),vm=require("vm");Object.assign(global,{self:global,require,Module,location:{href:__filename},Worker:nodeWorkerThreads.Worker,importScripts:e=>vm.runInThisContext(fs.readFileSync(e,"utf8"),{filename:e}),postMessage:e=>parentPort.postMessage(e),performance:global.performance||{now:Date.now}})}var initializedJS=!1;function threadPrintErr(){var e=Array.prototype.slice.call(arguments).join(" ");if(ENVIRONMENT_IS_NODE){fs.writeSync(2,e+`\\n`);return}console.error(e)}function threadAlert(){var e=Array.prototype.slice.call(arguments).join(" ");postMessage({cmd:"alert",text:e,threadId:Module._pthread_self()})}var err=threadPrintErr;self.alert=threadAlert,Module.instantiateWasm=(e,t)=>{var a=Module.wasmModule;Module.wasmModule=null;var r=new WebAssembly.Instance(a,e);return t(r)},self.onunhandledrejection=e=>{throw e.reason||e};function handleMessage(e){try{if(e.data.cmd==="load"){let a=[];self.onmessage=r=>a.push(r),self.startWorker=r=>{Module=r,postMessage({cmd:"loaded"});for(let s of a)handleMessage(s);self.onmessage=handleMessage},Module.wasmModule=e.data.wasmModule;for(const r of e.data.handlers)Module[r]=(...s)=>{postMessage({cmd:"callHandler",handler:r,args:s})};if(Module.wasmMemory=e.data.wasmMemory,Module.buffer=Module.wasmMemory.buffer,Module.ENVIRONMENT_IS_PTHREAD=!0,typeof e.data.urlOrBlob=="string")importScripts(e.data.urlOrBlob);else{var t=URL.createObjectURL(e.data.urlOrBlob);importScripts(t),URL.revokeObjectURL(t)}ortWasmThreaded(Module)}else if(e.data.cmd==="run"){Module.__emscripten_thread_init(e.data.pthread_ptr,0,0,1),Module.__emscripten_thread_mailbox_await(e.data.pthread_ptr),Module.establishStackSpace(),Module.PThread.receiveObjectTransfer(e.data),Module.PThread.threadInitTLS(),initializedJS||(initializedJS=!0);try{Module.invokeEntryPoint(e.data.start_routine,e.data.arg)}catch(a){if(a!="unwind")throw a}}else e.data.cmd==="cancel"?Module._pthread_self()&&Module.__emscripten_thread_exit(-1):e.data.target==="setimmediate"||(e.data.cmd==="checkMailbox"?initializedJS&&Module.checkMailbox():e.data.cmd&&(err(`worker.js received unknown command ${e.data.cmd}`),err(e.data)))}catch(a){throw Module.__emscripten_thread_crashed?.(),a}}self.onmessage=handleMessage;\\n\'});var Ar;Ar=gr();var an=_r(),Pt,Ut=!1,pt=!1,Sr=!1,on=u=>{if(u===1)return!1;if(typeof SharedArrayBuffer>"u")return typeof self<"u"&&!self.crossOriginIsolated&&console.warn("env.wasm.numThreads is set to "+u+", but this will not work unless you enable crossOriginIsolated mode. See https://web.dev/cross-origin-isolation-guide/ for more info."),!1;typeof process<"u"&&process.versions&&process.versions.node&&console.warn("env.wasm.numThreads is set to "+u+", however, currently onnxruntime-web does not support multi-threads in Node.js. Please consider using onnxruntime-node for performance critical scenarios.");try{return typeof MessageChannel<"u"&&new MessageChannel().port1.postMessage(new SharedArrayBuffer(1)),WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,5,4,1,3,1,1,10,11,1,9,0,65,0,254,16,2,0,26,11]))}catch{return!1}},sn=()=>{try{return WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,0,0,1,4,1,96,0,0,3,2,1,0,10,30,1,28,0,65,0,253,15,253,12,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,253,186,1,26,11]))}catch{return!1}},un=(u,c)=>u?c?"ort-wasm-simd-threaded.wasm":"ort-wasm-simd.wasm":c?"ort-wasm-threaded.wasm":"ort-wasm.wasm",Tr=async u=>{if(Ut)return Promise.resolve();if(pt)throw new Error("multiple calls to \'initializeWebAssembly()\' detected.");if(Sr)throw new Error("previous call to \'initializeWebAssembly()\' failed.");pt=!0;let c=u.initTimeout,a=u.numThreads,h=u.simd,f=on(a),w=h&&sn(),g=u.wasmPaths,i=typeof g=="string"?g:void 0,E=un(w,f),P=typeof g=="object"?g[E]:void 0,U=!1,D=[];if(c>0&&D.push(new Promise(x=>{setTimeout(()=>{U=!0,x()},c)})),D.push(new Promise((x,K)=>{let R=f?an:Ar,I={locateFile:(v,k)=>f&&v.endsWith(".worker.js")&&typeof Blob<"u"?URL.createObjectURL(new Blob([Er()],{type:"text/javascript"})):v.endsWith(".wasm")?P||(i??k)+E:k+v};if(f)if(I.numThreads=a,typeof Blob>"u")I.mainScriptUrlOrBlob=(void 0)(__dirname,"ort-wasm-threaded.js");else{let v=`var ortWasmThreaded=${R.toString()};`;I.mainScriptUrlOrBlob=new Blob([v],{type:"text/javascript"})}R(I).then(v=>{pt=!1,Ut=!0,Pt=v,x()},v=>{pt=!1,Sr=!0,K(v)})})),await Promise.race(D),U)throw new Error(`WebAssembly backend initializing failed due to timeout: ${c}ms`)},Z=()=>{if(Ut&&Pt)return Pt;throw new Error("WebAssembly is not initialized yet.")};var q=(u,c)=>{let a=Z(),h=a.lengthBytesUTF8(u)+1,f=a._malloc(h);return a.stringToUTF8(u,f,h),c.push(f),f},nt=(u,c,a,h)=>{if(typeof u=="object"&&u!==null){if(a.has(u))throw new Error("Circular reference in options");a.add(u)}Object.entries(u).forEach(([f,w])=>{let g=c?c+f:f;if(typeof w=="object")nt(w,g+".",a,h);else if(typeof w=="string"||typeof w=="number")h(g,w.toString());else if(typeof w=="boolean")h(g,w?"1":"0");else throw new Error(`Can\'t handle extra config type: ${typeof w}`)})},V=u=>{let c=Z(),a=c.stackSave();try{let h=c.stackAlloc(8);c._OrtGetLastError(h,h+4);let f=c.HEAP32[h/4],w=c.HEAPU32[h/4+1],g=w?c.UTF8ToString(w):"";throw new Error(`${u} ERROR_CODE: ${f}, ERROR_MESSAGE: ${g}`)}finally{c.stackRestore(a)}};var Mr=u=>{let c=Z(),a=0,h=[],f=u||{};try{if(u?.logSeverityLevel===void 0)f.logSeverityLevel=2;else if(typeof u.logSeverityLevel!="number"||!Number.isInteger(u.logSeverityLevel)||u.logSeverityLevel<0||u.logSeverityLevel>4)throw new Error(`log serverity level is not valid: ${u.logSeverityLevel}`);if(u?.logVerbosityLevel===void 0)f.logVerbosityLevel=0;else if(typeof u.logVerbosityLevel!="number"||!Number.isInteger(u.logVerbosityLevel))throw new Error(`log verbosity level is not valid: ${u.logVerbosityLevel}`);u?.terminate===void 0&&(f.terminate=!1);let w=0;return u?.tag!==void 0&&(w=q(u.tag,h)),a=c._OrtCreateRunOptions(f.logSeverityLevel,f.logVerbosityLevel,!!f.terminate,w),a===0&&V("Can\'t create run options."),u?.extra!==void 0&&nt(u.extra,"",new WeakSet,(g,i)=>{let E=q(g,h),P=q(i,h);c._OrtAddRunConfigEntry(a,E,P)!==0&&V(`Can\'t set a run config entry: ${g} - ${i}.`)}),[a,h]}catch(w){throw a!==0&&c._OrtReleaseRunOptions(a),h.forEach(g=>c._free(g)),w}};var fn=u=>{switch(u){case"disabled":return 0;case"basic":return 1;case"extended":return 2;case"all":return 99;default:throw new Error(`unsupported graph optimization level: ${u}`)}},ln=u=>{switch(u){case"sequential":return 0;case"parallel":return 1;default:throw new Error(`unsupported execution mode: ${u}`)}},cn=u=>{u.extra||(u.extra={}),u.extra.session||(u.extra.session={});let c=u.extra.session;c.use_ort_model_bytes_directly||(c.use_ort_model_bytes_directly="1"),u.executionProviders&&u.executionProviders.some(a=>(typeof a=="string"?a:a.name)==="webgpu")&&(u.enableMemPattern=!1)},dn=(u,c,a)=>{for(let h of c){let f=typeof h=="string"?h:h.name;switch(f){case"webnn":if(f="WEBNN",typeof h!="string"){let g=h;if(g?.deviceType){let i=q("deviceType",a),E=q(g.deviceType,a);Z()._OrtAddSessionConfigEntry(u,i,E)!==0&&V(`Can\'t set a session config entry: \'deviceType\' - ${g.deviceType}.`)}if(g?.numThreads){let i=g.numThreads;(typeof i!="number"||!Number.isInteger(i)||i<0)&&(i=0);let E=q("numThreads",a),P=q(i.toString(),a);Z()._OrtAddSessionConfigEntry(u,E,P)!==0&&V(`Can\'t set a session config entry: \'numThreads\' - ${g.numThreads}.`)}if(g?.powerPreference){let i=q("powerPreference",a),E=q(g.powerPreference,a);Z()._OrtAddSessionConfigEntry(u,i,E)!==0&&V(`Can\'t set a session config entry: \'powerPreference\' - ${g.powerPreference}.`)}}break;case"webgpu":if(f="JS",typeof h!="string"){let g=h;if(g?.preferredLayout){if(g.preferredLayout!=="NCHW"&&g.preferredLayout!=="NHWC")throw new Error(`preferredLayout must be either \'NCHW\' or \'NHWC\': ${g.preferredLayout}`);let i=q("preferredLayout",a),E=q(g.preferredLayout,a);Z()._OrtAddSessionConfigEntry(u,i,E)!==0&&V(`Can\'t set a session config entry: \'preferredLayout\' - ${g.preferredLayout}.`)}}break;case"wasm":case"cpu":continue;default:throw new Error(`not supported execution provider: ${f}`)}let w=q(f,a);Z()._OrtAppendExecutionProvider(u,w)!==0&&V(`Can\'t append execution provider: ${f}.`)}},Cr=u=>{let c=Z(),a=0,h=[],f=u||{};cn(f);try{let w=fn(f.graphOptimizationLevel??"all"),g=ln(f.executionMode??"sequential"),i=typeof f.logId=="string"?q(f.logId,h):0,E=f.logSeverityLevel??2;if(!Number.isInteger(E)||E<0||E>4)throw new Error(`log serverity level is not valid: ${E}`);let P=f.logVerbosityLevel??0;if(!Number.isInteger(P)||P<0||P>4)throw new Error(`log verbosity level is not valid: ${P}`);let U=typeof f.optimizedModelFilePath=="string"?q(f.optimizedModelFilePath,h):0;if(a=c._OrtCreateSessionOptions(w,!!f.enableCpuMemArena,!!f.enableMemPattern,g,!!f.enableProfiling,0,i,E,P,U),a===0&&V("Can\'t create session options."),f.executionProviders&&dn(a,f.executionProviders,h),f.enableGraphCapture!==void 0){if(typeof f.enableGraphCapture!="boolean")throw new Error(`enableGraphCapture must be a boolean value: ${f.enableGraphCapture}`);let D=q("enableGraphCapture",h),x=q(f.enableGraphCapture.toString(),h);c._OrtAddSessionConfigEntry(a,D,x)!==0&&V(`Can\'t set a session config entry: \'enableGraphCapture\' - ${f.enableGraphCapture}.`)}if(f.freeDimensionOverrides)for(let[D,x]of Object.entries(f.freeDimensionOverrides)){if(typeof D!="string")throw new Error(`free dimension override name must be a string: ${D}`);if(typeof x!="number"||!Number.isInteger(x)||x<0)throw new Error(`free dimension override value must be a non-negative integer: ${x}`);let K=q(D,h);c._OrtAddFreeDimensionOverride(a,K,x)!==0&&V(`Can\'t set a free dimension override: ${D} - ${x}.`)}return f.extra!==void 0&&nt(f.extra,"",new WeakSet,(D,x)=>{let K=q(D,h),R=q(x,h);c._OrtAddSessionConfigEntry(a,K,R)!==0&&V(`Can\'t set a session config entry: ${D} - ${x}.`)}),[a,h]}catch(w){throw a!==0&&c._OrtReleaseSessionOptions(a),h.forEach(g=>c._free(g)),w}};var Rt=u=>{switch(u){case"int8":return 3;case"uint8":return 2;case"bool":return 9;case"int16":return 5;case"uint16":return 4;case"int32":return 6;case"uint32":return 12;case"float16":return 10;case"float32":return 1;case"float64":return 11;case"string":return 8;case"int64":return 7;case"uint64":return 13;default:throw new Error(`unsupported data type: ${u}`)}},Dr=u=>{switch(u){case 3:return"int8";case 2:return"uint8";case 9:return"bool";case 5:return"int16";case 4:return"uint16";case 6:return"int32";case 12:return"uint32";case 10:return"float16";case 1:return"float32";case 11:return"float64";case 8:return"string";case 7:return"int64";case 13:return"uint64";default:throw new Error(`unsupported data type: ${u}`)}},It=u=>[void 0,4,1,1,2,2,4,8,void 0,1,2,8,4,8,void 0,void 0,void 0][u],Fr=u=>{switch(u){case"float16":return typeof Float16Array<"u"&&Float16Array.from?Float16Array:Uint16Array;case"float32":return Float32Array;case"uint8":return Uint8Array;case"int8":return Int8Array;case"uint16":return Uint16Array;case"int16":return Int16Array;case"int32":return Int32Array;case"bool":return Uint8Array;case"float64":return Float64Array;case"uint32":return Uint32Array;case"int64":return BigInt64Array;case"uint64":return BigUint64Array;default:throw new Error(`unsupported type: ${u}`)}},xr=u=>{switch(u){case"verbose":return 0;case"info":return 1;case"warning":return 2;case"error":return 3;case"fatal":return 4;default:throw new Error(`unsupported logging level: ${u}`)}},Pr=u=>u==="float32"||u==="float16"||u==="int32"||u==="int64"||u==="uint32"||u==="uint8"||u==="bool",Ur=u=>{switch(u){case"none":return 0;case"cpu":return 1;case"cpu-pinned":return 2;case"texture":return 3;case"gpu-buffer":return 4;default:throw new Error(`unsupported data location: ${u}`)}};var Rr=async u=>{if(typeof u=="string")if(typeof process<"u"&&process.versions&&process.versions.node)try{return new Uint8Array(await(void 0)(u))}catch(c){if(c.code==="ERR_FS_FILE_TOO_LARGE"){let a=(void 0)(u),h=[];for await(let f of a)h.push(f);return new Uint8Array(Buffer.concat(h))}throw c}else{let c=await fetch(u);if(!c.ok)throw new Error(`failed to load external data file: ${u}`);let a=c.headers.get("Content-Length"),h=a?parseInt(a,10):0;if(h<1073741824)return new Uint8Array(await c.arrayBuffer());{if(!c.body)throw new Error(`failed to load external data file: ${u}, no response body.`);let f=c.body.getReader(),w;try{w=new ArrayBuffer(h)}catch(i){if(i instanceof RangeError){let E=Math.ceil(h/65536);w=new WebAssembly.Memory({initial:E,maximum:E}).buffer}else throw i}let g=0;for(;;){let{done:i,value:E}=await f.read();if(i)break;let P=E.byteLength;new Uint8Array(w,g,P).set(E),g+=P}return new Uint8Array(w,0,h)}}else return u instanceof Blob?new Uint8Array(await u.arrayBuffer()):u instanceof Uint8Array?u:new Uint8Array(u)};var pn=(u,c)=>{Z()._OrtInit(u,c)!==0&&V("Can\'t initialize onnxruntime.")},Lr=async u=>{pn(u.wasm.numThreads,xr(u.logLevel))},Br=async(u,c)=>{},ze=new Map,mn=u=>{let c=Z(),a=c.stackSave();try{let h=c.stackAlloc(8);return c._OrtGetInputOutputCount(u,h,h+4)!==0&&V("Can\'t get session input/output count."),[c.HEAP32[h/4],c.HEAP32[h/4+1]]}finally{c.stackRestore(a)}},Lt=u=>{let c=Z(),a=c._malloc(u.byteLength);if(a===0)throw new Error(`Can\'t create a session. failed to allocate a buffer of size ${u.byteLength}.`);return c.HEAPU8.set(u,a),[a,u.byteLength]},kr=async(u,c)=>{let a,h,f=Z();Array.isArray(u)?[a,h]=u:u.buffer===f.HEAPU8.buffer?[a,h]=[u.byteOffset,u.byteLength]:[a,h]=Lt(u);let w=0,g=0,i=0,E=[],P=[],U=[];try{if([g,E]=Cr(c),c?.externalData&&f.mountExternalData){let W=[];for(let H of c.externalData){let se=typeof H=="string"?H:H.path;W.push(Rr(typeof H=="string"?H:H.data).then(ee=>{f.mountExternalData(se,ee)}))}await Promise.all(W)}w=await f._OrtCreateSession(a,h,g),w===0&&V("Can\'t create a session.");let[D,x]=mn(w),K=!!c?.enableGraphCapture,R=[],I=[],v=[];for(let W=0;W<D;W++){let H=f._OrtGetInputName(w,W);H===0&&V("Can\'t get an input name."),P.push(H),R.push(f.UTF8ToString(H))}for(let W=0;W<x;W++){let H=f._OrtGetOutputName(w,W);H===0&&V("Can\'t get an output name."),U.push(H);let se=f.UTF8ToString(H);I.push(se)}let k=null;return ze.set(w,[w,P,U,k,K,!1]),[w,R,I]}catch(D){throw P.forEach(x=>f._OrtFree(x)),U.forEach(x=>f._OrtFree(x)),i!==0&&f._OrtReleaseBinding(i),w!==0&&f._OrtReleaseSession(w),D}finally{f._free(a),g!==0&&f._OrtReleaseSessionOptions(g),E.forEach(D=>f._free(D)),f.unmountExternalData?.()}},Wr=u=>{let c=Z(),a=ze.get(u);if(!a)throw new Error(`cannot release session. invalid session id: ${u}`);let[h,f,w,g,i]=a;g&&(i&&c._OrtClearBoundOutputs(g.handle),c._OrtReleaseBinding(g.handle)),c.jsepOnReleaseSession?.(u),f.forEach(E=>c._OrtFree(E)),w.forEach(E=>c._OrtFree(E)),c._OrtReleaseSession(h),ze.delete(u)},Ir=(u,c,a,h,f,w=!1)=>{if(!u){c.push(0);return}let g=Z(),i=u[0],E=u[1],P=u[3],U,D;if(i==="string"&&P==="gpu-buffer")throw new Error("String tensor is not supported on GPU.");if(w&&P!=="gpu-buffer")throw new Error(`External buffer must be provided for input/output index ${f} when enableGraphCapture is true.`);if(P==="gpu-buffer"){let R=u[2].gpuBuffer,I=It(Rt(i));D=E.reduce((k,W)=>k*W,1)*I;let v=g.jsepRegisterBuffer;if(!v)throw new Error(\'Tensor location "gpu-buffer" is not supported without using WebGPU.\');U=v(h,f,R,D)}else{let R=u[2];if(Array.isArray(R)){D=4*R.length,U=g._malloc(D),a.push(U);let I=U/4;for(let v=0;v<R.length;v++){if(typeof R[v]!="string")throw new TypeError(`tensor data at index ${v} is not a string`);g.HEAPU32[I++]=q(R[v],a)}}else D=R.byteLength,U=g._malloc(D),a.push(U),g.HEAPU8.set(new Uint8Array(R.buffer,R.byteOffset,D),U)}let x=g.stackSave(),K=g.stackAlloc(4*E.length);try{let R=K/4;E.forEach(v=>g.HEAP32[R++]=v);let I=g._OrtCreateTensor(Rt(i),U,D,K,E.length,Ur(P));I===0&&V(`Can\'t create tensor for input/output. session=${h}, index=${f}.`),c.push(I)}finally{g.stackRestore(x)}},Nr=async(u,c,a,h,f,w)=>{let g=Z(),i=ze.get(u);if(!i)throw new Error(`cannot run inference. invalid session id: ${u}`);let E=i[0],P=i[1],U=i[2],D=i[3],x=i[4],K=i[5],R=c.length,I=h.length,v=0,k=[],W=[],H=[],se=[],ee=g.stackSave(),S=g.stackAlloc(R*4),j=g.stackAlloc(R*4),Ce=g.stackAlloc(I*4),Ue=g.stackAlloc(I*4);try{[v,k]=Mr(w);for(let F=0;F<R;F++)Ir(a[F],W,se,u,c[F],x);for(let F=0;F<I;F++)Ir(f[F],H,se,u,R+h[F],x);let ce=S/4,ne=j/4,Q=Ce/4,Oe=Ue/4;for(let F=0;F<R;F++)g.HEAPU32[ce++]=W[F],g.HEAPU32[ne++]=P[c[F]];for(let F=0;F<I;F++)g.HEAPU32[Q++]=H[F],g.HEAPU32[Oe++]=U[h[F]];g.jsepOnRunStart?.(E);let he;he=await g._OrtRun(E,j,S,R,Ue,I,Ce,v),he!==0&&V("failed to call OrtRun().");let ae=[];for(let F=0;F<I;F++){let ye=g.HEAPU32[Ce/4+F];if(ye===H[F]){ae.push(f[F]);continue}let ve=g.stackSave(),fe=g.stackAlloc(4*4),_e=!1,Y,pe=0;try{g._OrtGetTensorData(ye,fe,fe+4,fe+8,fe+12)!==0&&V(`Can\'t access output tensor data on index ${F}.`);let Ee=fe/4,be=g.HEAPU32[Ee++];pe=g.HEAPU32[Ee++];let we=g.HEAPU32[Ee++],Le=g.HEAPU32[Ee++],me=[];for(let te=0;te<Le;te++)me.push(g.HEAPU32[we/4+te]);g._OrtFree(we);let Se=me.reduce((te,z)=>te*z,1);Y=Dr(be);let De=D?.outputPreferredLocations[h[F]];if(Y==="string"){if(De==="gpu-buffer")throw new Error("String tensor is not supported on GPU.");let te=[],z=pe/4;for(let le=0;le<Se;le++){let Fe=g.HEAPU32[z++],Ae=le===Se-1?void 0:g.HEAPU32[z]-Fe;te.push(g.UTF8ToString(Fe,Ae))}ae.push([Y,me,te,"cpu"])}else if(De==="gpu-buffer"&&Se>0){let te=g.jsepGetBuffer;if(!te)throw new Error(\'preferredLocation "gpu-buffer" is not supported without using WebGPU.\');let z=te(pe),le=It(be);if(le===void 0||!Pr(Y))throw new Error(`Unsupported data type: ${Y}`);_e=!0,ae.push([Y,me,{gpuBuffer:z,download:g.jsepCreateDownloader(z,Se*le,Y),dispose:()=>{g._OrtReleaseTensor(ye)}},"gpu-buffer"])}else{let te=Fr(Y),z=new te(Se);new Uint8Array(z.buffer,z.byteOffset,z.byteLength).set(g.HEAPU8.subarray(pe,pe+z.byteLength)),ae.push([Y,me,z,"cpu"])}}finally{g.stackRestore(ve),Y==="string"&&pe&&g._free(pe),_e||g._OrtReleaseTensor(ye)}}return D&&!x&&(g._OrtClearBoundOutputs(D.handle),ze.set(u,[E,P,U,D,x,!1])),ae}finally{g.stackRestore(ee),W.forEach(ce=>g._OrtReleaseTensor(ce)),H.forEach(ce=>g._OrtReleaseTensor(ce)),se.forEach(ce=>g._free(ce)),v!==0&&g._OrtReleaseRunOptions(v),k.forEach(ce=>g._free(ce))}},Hr=u=>{let c=Z(),a=ze.get(u);if(!a)throw new Error("invalid session id");let h=a[0],f=c._OrtEndProfiling(h);f===0&&V("Can\'t get an profile file name."),c._OrtFree(f)},Gr=u=>{let c=[];for(let a of u){let h=a[2];!Array.isArray(h)&&"buffer"in h&&c.push(h.buffer)}return c};self.onmessage=u=>{let{type:c,in:a}=u.data;try{switch(c){case"init-wasm":Tr(a.wasm).then(()=>{Lr(a).then(()=>{postMessage({type:c})},h=>{postMessage({type:c,err:h})})},h=>{postMessage({type:c,err:h})});break;case"init-ep":{let{epName:h,env:f}=a;Br(f,h).then(()=>{postMessage({type:c})},w=>{postMessage({type:c,err:w})});break}case"copy-from":{let{buffer:h}=a,f=Lt(h);postMessage({type:c,out:f});break}case"create":{let{model:h,options:f}=a;kr(h,f).then(w=>{postMessage({type:c,out:w})},w=>{postMessage({type:c,err:w})});break}case"release":Wr(a),postMessage({type:c});break;case"run":{let{sessionId:h,inputIndices:f,inputs:w,outputIndices:g,options:i}=a;Nr(h,f,w,g,new Array(g.length).fill(null),i).then(E=>{E.some(P=>P[3]!=="cpu")?postMessage({type:c,err:"Proxy does not support non-cpu tensor location."}):postMessage({type:c,out:E},Gr([...w,...E]))},E=>{postMessage({type:c,err:E})});break}case"end-profiling":Hr(a),postMessage({type:c});break;default:}}catch(h){postMessage({type:c,err:h})}};})();\n'});var Ze,Oe,_t,jt,zt,Er,_r,lt,ct,Za,Gt,ca,da,pa,ma,ha,ga,ya,Ar=H(()=>{"use strict";Qe();fa();ut();Ze=()=>!!G.wasm.proxy&&typeof document<"u",_t=!1,jt=!1,zt=!1,_r=new Map,lt=(r,t)=>{let n=_r.get(r);n?n.push(t):_r.set(r,[t])},ct=()=>{if(_t||!jt||zt||!Oe)throw new Error("worker not ready")},Za=r=>{switch(r.data.type){case"init-wasm":_t=!1,r.data.err?(zt=!0,Er[1](r.data.err)):(jt=!0,Er[0]());break;case"init-ep":case"copy-from":case"create":case"release":case"run":case"end-profiling":{let t=_r.get(r.data.type);r.data.err?t.shift()[1](r.data.err):t.shift()[0](r.data.out);break}default:}},Gt=typeof document<"u"?document?.currentScript?.src:void 0,ca=async()=>{if(!jt){if(_t)throw new Error("multiple calls to 'initWasm()' detected.");if(zt)throw new Error("previous call to 'initWasm()' failed.");if(_t=!0,Ze())return G.wasm.wasmPaths===void 0&&Gt&&Gt.indexOf("blob:")!==0&&(G.wasm.wasmPaths=Gt.substr(0,+Gt.lastIndexOf("/")+1)),new Promise((r,t)=>{Oe?.terminate();let n=URL.createObjectURL(new Blob([la()],{type:"text/javascript"}));Oe=new Worker(n,{name:"ort-wasm-proxy-worker"}),Oe.onerror=i=>t(i),Oe.onmessage=Za,URL.revokeObjectURL(n),Er=[r,t];let f={type:"init-wasm",in:G};Oe.postMessage(f)});try{await Yn(G.wasm),await ra(G),jt=!0}catch(r){throw zt=!0,r}finally{_t=!1}}},da=async r=>{if(Ze())return ct(),new Promise((t,n)=>{lt("init-ep",[t,n]);let f={type:"init-ep",in:{epName:r,env:G}};Oe.postMessage(f)});await na(G,r)},pa=async r=>Ze()?(ct(),new Promise((t,n)=>{lt("copy-from",[t,n]);let f={type:"copy-from",in:{buffer:r}};Oe.postMessage(f,[r.buffer])})):Or(r),ma=async(r,t)=>{if(Ze()){if(t?.preferredOutputLocation)throw new Error('session option "preferredOutputLocation" is not supported for proxy.');return ct(),new Promise((n,f)=>{lt("create",[n,f]);let i={type:"create",in:{model:r,options:{...t}}},m=[];r instanceof Uint8Array&&m.push(r.buffer),Oe.postMessage(i,m)})}else return aa(r,t)},ha=async r=>{if(Ze())return ct(),new Promise((t,n)=>{lt("release",[t,n]);let f={type:"release",in:r};Oe.postMessage(f)});oa(r)},ga=async(r,t,n,f,i,m)=>{if(Ze()){if(n.some(d=>d[3]!=="cpu"))throw new Error("input tensor on GPU is not supported for proxy.");if(i.some(d=>d))throw new Error("pre-allocated output tensor is not supported for proxy.");return ct(),new Promise((d,s)=>{lt("run",[d,s]);let h=n,g={type:"run",in:{sessionId:r,inputIndices:t,inputs:h,outputIndices:f,options:m}};Oe.postMessage(g,ua(h))})}else return ia(r,t,n,f,i,m)},ya=async r=>{if(Ze())return ct(),new Promise((t,n)=>{lt("end-profiling",[t,n]);let f={type:"end-profiling",in:r};Oe.postMessage(f)});sa(r)}});var wa,Ka,Yt,ba=H(()=>{"use strict";Qe();Ar();br();vr();wa=(r,t)=>{switch(r.location){case"cpu":return[r.type,r.dims,r.data,"cpu"];case"gpu-buffer":return[r.type,r.dims,{gpuBuffer:r.gpuBuffer},"gpu-buffer"];default:throw new Error(`invalid data location: ${r.location} for ${t()}`)}},Ka=r=>{switch(r[3]){case"cpu":return new ce(r[0],r[2],r[1]);case"gpu-buffer":{let t=r[0];if(!$t(t))throw new Error(`not supported data type: ${t} for deserializing GPU tensor`);let{gpuBuffer:n,download:f,dispose:i}=r[2];return ce.fromGpuBuffer(n,{dataType:t,dims:r[1],download:f,dispose:i})}default:throw new Error(`invalid data location: ${r[3]}`)}},Yt=class{async fetchModelAndCopyToWasmMemory(t){return pa(await Et(t))}async loadModel(t,n){He();let f;typeof t=="string"?typeof process<"u"&&process.versions&&process.versions.node?f=await Et(t):f=await this.fetchModelAndCopyToWasmMemory(t):f=t,[this.sessionId,this.inputNames,this.outputNames]=await ma(f,n),$e()}async dispose(){return ha(this.sessionId)}async run(t,n,f){He();let i=[],m=[];Object.entries(t).forEach(v=>{let C=v[0],x=v[1],P=this.inputNames.indexOf(C);if(P===-1)throw new Error(`invalid input '${C}'`);i.push(x),m.push(P)});let d=[],s=[];Object.entries(n).forEach(v=>{let C=v[0],x=v[1],P=this.outputNames.indexOf(C);if(P===-1)throw new Error(`invalid output '${C}'`);d.push(x),s.push(P)});let h=i.map((v,C)=>wa(v,()=>`input "${this.inputNames[m[C]]}"`)),g=d.map((v,C)=>v?wa(v,()=>`output "${this.outputNames[s[C]]}"`):null),O=await ga(this.sessionId,m,h,s,g,f),E={};for(let v=0;v<O.length;v++)E[this.outputNames[s[v]]]=d[v]??Ka(O[v]);return $e(),E}startProfiling(){}endProfiling(){ya(this.sessionId)}}});var eo,qt,va=H(()=>{"use strict";Qe();Ar();ba();eo=()=>{if((typeof G.wasm.initTimeout!="number"||G.wasm.initTimeout<0)&&(G.wasm.initTimeout=0),typeof G.wasm.simd!="boolean"&&(G.wasm.simd=!0),typeof G.wasm.proxy!="boolean"&&(G.wasm.proxy=!1),typeof G.wasm.trace!="boolean"&&(G.wasm.trace=!1),typeof G.wasm.numThreads!="number"||!Number.isInteger(G.wasm.numThreads)||G.wasm.numThreads<=0){(typeof self<"u"&&!self.crossOriginIsolated||typeof process<"u"&&process.versions&&process.versions.node)&&(G.wasm.numThreads=1);let r=typeof navigator>"u"?(void 0)().length:navigator.hardwareConcurrency;G.wasm.numThreads=Math.min(4,Math.ceil((r||1)/2))}},qt=class{async init(t){eo(),await ca(),await da(t)}async createInferenceSessionHandler(t,n){let f=new Yt;return await f.loadModel(t,n),Promise.resolve(f)}}});var Oa={};it(Oa,{wasmBackend:()=>to});var to,Ea=H(()=>{"use strict";va();to=new qt});var no={};it(no,{InferenceSession:()=>En,TRACE:()=>ir,TRACE_FUNC_BEGIN:()=>He,TRACE_FUNC_END:()=>$e,Tensor:()=>ce,TrainingSession:()=>xn,default:()=>ro,env:()=>G,registerBackend:()=>st});Qe();Qe();Qe();var Rn="1.17.3";var ro=ur;{let r=(Ea(),Ve(Oa)).wasmBackend;st("cpu",r,10),st("wasm",r,10)}Object.defineProperty(G.versions,"web",{value:Rn,enumerable:!0});return Ve(no);})();
+//# sourceMappingURL=ort.wasm.min.js.map
+
+;if(typeof ort==='undefined'&&typeof self!=='undefined'&&self.ort){var ort=self.ort;}
+/* Kol pocket voice: the text step in the browser (Tab, Nov 1 2026).
+   A line-by-line port of the Python text step the big voice uses (yv-code: abbrev.expand + lk.lk_pass (vowels off) =
+   accent.pre_tts; the listener's say_numbers and chunks; accent.to_tts with expand=False), so the small voice reads exactly
+   the text the big one was taught on. Data (word list, abbreviations, references) comes from pocket-text-data.json, generated
+   from the same CSVs. No lookbehind regexes (older iPhones). Parity with Python is checked by pocket/parity_test.py. */
+(function (root) {
+  "use strict";
+  var PROT = "\ue000", LKM = "\ue001", D = null;
+  var HEB = "\u05d0-\u05ea", isHeb = function (c) { return c >= "\u05d0" && c <= "\u05ea"; };
+  var MARKS_RE = /[\ue000-\ue00f]/g;
+  function pin(s, str) { return s === "" || str.indexOf(s) >= 0; }          // python: s in "..."
+  function setOf(a) { var o = Object.create(null); for (var i = 0; i < a.length; i++) o[a[i]] = 1; return o; }
+  function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+  function pysplit(t) { t = t.replace(/^\s+|\s+$/g, ""); return t === "" ? [] : t.split(/\s+/); }
+  function strip(s, chars) { var i = 0, j = s.length; while (i < j && chars.indexOf(s[i]) >= 0) i++; while (j > i && chars.indexOf(s[j - 1]) >= 0) j--; return s.slice(i, j); }
+  function rstrip(s, chars) { var j = s.length; while (j > 0 && chars.indexOf(s[j - 1]) >= 0) j--; return s.slice(0, j); }
+  function lstrip(s, chars) { var i = 0; while (i < s.length && chars.indexOf(s[i]) >= 0) i++; return s.slice(i); }
+  function endsAny(s, a) { for (var i = 0; i < a.length; i++) if (s.length >= a[i].length && s.slice(s.length - a[i].length) === a[i]) return true; return false; }
+  function startsAny(s, a) { for (var i = 0; i < a.length; i++) if (s.indexOf(a[i]) === 0) return true; return false; }
+  var YI_FW, HE_FW, REF_WORDS, STOP_BARE, MONTHS, PARSHA, GOD;
+  function init(data) {
+    D = data; YI_FW = setOf(data.yi_fw); HE_FW = setOf(data.he_fw); REF_WORDS = setOf(data.ref_words);
+    STOP_BARE = setOf(["דא", "מה", "לא", "נו", "לו", "יא", "קען", "רב", "טו", "בא", "גא", "די", "אט", "קמא", "בתרא", "מציעא", "תנינא", "שני", "ראשון", "אחרון", "קמייתא", "בתרייתא"]);
+    MONTHS = setOf(["ניסן", "אייר", "סיון", "סיוון", "תמוז", "אב", "מנחם", "אלול", "תשרי", "חשון", "חשוון", "מרחשון", "כסלו", "כסליו", "טבת", "שבט", "אדר"]);
+    PARSHA = setOf("בראשית נח לך וירא חיי תולדות ויצא וישלח וישב מקץ ויגש ויחי שמות וארא בא בשלח יתרו משפטים תרומה תצוה כי ויקהל פקודי ויקרא צו שמיני תזריע מצורע אחרי קדושים אמור בהר בחוקותי בחקתי במדבר נשא בהעלותך שלח קרח חקת חוקת בלק פנחס מטות מסעי דברים ואתחנן עקב ראה שופטים תצא תבוא נצבים וילך האזינו וזאת".split(" "));
+    GOD = setOf(["הקדוש", "השם", "הקב\"ה", "הבורא", "אלקים", "ה'", "הוא", "יתברך", "המקום", "השי\"ת", "השם יתברך"]);
+  }
+  // ---------- numbers (listener.py say_numbers; abbrev.py yi_num) ----------
+  var _U = ["נול", "איינס", "צוויי", "דריי", "פיר", "פינף", "זעקס", "זיבן", "אכט", "ניין", "צען", "עלף", "צוועלף", "דרייצען", "פערצען",
+            "פיפצען", "זעכצען", "זיבעצען", "אכצען", "ניינצען"];
+  var _T = { 2: "צוואנציג", 3: "דרייסיג", 4: "פערציג", 5: "פיפציג", 6: "זעכציג", 7: "זיבעציג", 8: "אכציג", 9: "ניינציג" };
+  function yi_num(n) {                                   // the listener's version (years 1100-1999, millions)
+    n = Math.floor(Number(n));
+    if (!isFinite(n)) return "";
+    if (n < 20) return _U[n];
+    if (n < 100) { var t = Math.floor(n / 10), u = n % 10; return !u ? _T[t] : (u === 1 ? "איין" : _U[u]) + " און " + _T[t]; }
+    if (n < 1000) { var h = Math.floor(n / 100), r = n % 100; return (h === 1 ? "" : _U[h] + " ") + "הונדערט" + (r ? " און " + yi_num(r) : ""); }
+    if (n >= 1100 && n < 2000) { var h2 = Math.floor(n / 100), r2 = n % 100; return yi_num(h2) + " הונדערט" + (r2 ? " און " + yi_num(r2) : ""); }
+    if (n < 1000000) { var k = Math.floor(n / 1000), r3 = n % 1000; return (k === 1 ? "" : yi_num(k) + " ") + "טויזנט" + (r3 ? " און " + yi_num(r3) : ""); }
+    if (n < 1e12) { var m = Math.floor(n / 1000000), r4 = n % 1000000; return (m === 1 ? "איין" : yi_num(m)) + " מיליאן" + (r4 ? " און " + yi_num(r4) : ""); }
+    return String(n).split("").map(function (c) { return _U[+c]; }).join(" ");
+  }
+  function yi_num_digits(s) {                            // \d+ may be longer than a safe JS number: the python fallback reads digits
+    if (s.length > 15) return s.split("").map(function (c) { return _U[+c]; }).join(" ");
+    return yi_num(parseInt(s, 10));
+  }
+  function yi_num_ab(n) {                                // abbrev.py's version (no year / million rule)
+    n = Math.floor(n);
+    if (n < 20) return _U[n];
+    if (n < 100) { var t = Math.floor(n / 10), u = n % 10; return !u ? _T[t] : (u === 1 ? "איין" : _U[u]) + " און " + _T[t]; }
+    if (n < 1000) { var h = Math.floor(n / 100), r = n % 100; return (h === 1 ? "" : _U[h] + " ") + "הונדערט" + (r ? " און " + yi_num_ab(r) : ""); }
+    var k = Math.floor(n / 1000), r3 = n % 1000; return (k === 1 ? "" : yi_num_ab(k) + " ") + "טויזנט" + (r3 ? " און " + yi_num_ab(r3) : "");
+  }
+  var _FIN = { "ף": "פ", "ך": "כ", "ם": "מ", "ן": "נ", "ץ": "צ" };
+  var LET = "\\p{L}\\p{Nl}\\p{No}";                      // python [^\W\d_] (letters)
+  function isLetter(c) { return !!c && /[\p{L}\p{Nl}\p{No}]/u.test(c); }
+  function say_numbers(t) {
+    t = t.replace(/(\d),(?=\d{3}(?![\p{L}\p{N}_]))/gu, "$1");
+    t = t.replace(/(\d+)\.(\d+)/g, function (m, a, b) { return yi_num_digits(a) + " פונקט " + b.split("").map(function (c) { return _U[+c]; }).join(" "); });
+    t = t.replace(/\$\s*(\d+)/g, function (m, a) { return yi_num_digits(a) + " דאלאר"; });
+    // (?<![^\W\d_])([בלמ])[-־]?(?=\d)
+    t = t.replace(/([בלמ])[-־]?(?=\d)/g, function (m, l, off, s) { return isLetter(s[off - 1]) ? m : { "ב": "אין ", "ל": "צו ", "מ": "פון " }[l]; });
+    // (?<=[^\W\d_])[-־]?(?=\d)
+    t = t.replace(/[-־]?(?=\d)/g, function (m, off, s) {
+      var prev = s[off - 1]; return isLetter(prev) ? " " : m;
+    });
+    t = t.replace(/(\d+)(ס?ט)(ן|ער|ע|ס)?(?![\p{L}\p{Nl}\p{No}])/gu, function (m, n, st, end) {
+      n = parseInt(n, 10); end = end || ""; var special = { 1: "ערשט", 3: "דריט", 7: "זיבעט", 8: "אכט" }, stem;
+      if (has(special, n)) stem = special[n];
+      else { var w = yi_num(n); w = w.slice(0, -1) + (_FIN[w.slice(-1)] || w.slice(-1)); stem = w + (n < 20 ? "ט" : "סט"); }
+      return stem + end;
+    });
+    t = t.replace(/\d+/g, function (m) { return yi_num_digits(m); });
+    return t.replace(/\s*%/g, " פראצענט");
+  }
+  // ---------- sentence pieces (listener.py chunks) ----------
+  function chunks(text, maxc) {
+    maxc = maxc || 140; var out = [];
+    var s = text.replace(/^\s+|\s+$/g, "").replace(/\s+/g, " ");
+    var parts = s.replace(/([.!?:;])\s+/g, "$1\u0001").split("\u0001");
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      while (p.length > maxc) {
+        var cut = p.lastIndexOf(",", maxc - 1);
+        if (cut < 40) cut = p.lastIndexOf(" ", maxc - 1);
+        if (cut < 20) cut = maxc;
+        out.push([p.slice(0, cut + 1).trim(), false]); p = p.slice(cut + 1).trim();
+      }
+      if (p) out.push([p, true]);
+    }
+    return out.map(function (x) { var c = x[0]; return /[.!?:;,]$/.test(c.replace(MARKS_RE, "")) ? c : c + (x[1] ? "." : ","); });
+  }
+  // ---------- abbreviations + references (abbrev.py) ----------
+  var _VAL = {}; "אבגדהוזחטיכלמנסעפצקרשת".split("").forEach(function (c, i) { _VAL[c] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400][i]; });
+  _VAL["ך"] = 20; _VAL["ם"] = 40; _VAL["ן"] = 50; _VAL["ף"] = 80; _VAL["ץ"] = 90;
+  var _BASE = { "ך": "כ", "ם": "מ", "ן": "נ", "ף": "פ", "ץ": "צ" };
+  var LETTER_NAME = { "א": "אַלעף", "ב": "בייס", "ג": "גימל", "ד": "דאַלעד", "ה": "היי", "ו": "וואוו", "ז": "זאַיִן", "ח": "כעס", "ט": "טעס",
+    "י": "יוד", "כ": "קאף", "ל": "לאַמעד", "מ": "מעם", "נ": "נון", "ס": "סאַמעך", "ע": "אַיִן", "פ": "פיי", "צ": "צאַדיק",
+    "ק": "קוף", "ר": "רייש", "ש": "שין", "ת": "טאף" };
+  function gem(s) {
+    s = s.split('"').join("").split("'").join("");
+    if (!s) return null;
+    for (var i = 0; i < s.length; i++) if (!has(_VAL, s[i])) return null;
+    if (s === "טו" || s === "טז") return _VAL[s[0]] + _VAL[s[1]];
+    if (endsAny(s, ["יה", "יו"])) return null;
+    var prev = 1e9, ranks = {}, sum = 0;
+    for (var j = 0; j < s.length; j++) {
+      var v = _VAL[s[j]], r = v < 10 ? 0 : v < 100 ? 1 : 2;
+      if (v > prev || (v === prev && v !== 400) || (ranks[r] && r !== 2)) return null;
+      ranks[r] = 1; prev = v; sum += v;
+    }
+    return sum;
+  }
+  function mode() { return (D.ref_mode || "letters").toLowerCase().indexOf("num") === 0 ? "numbers" : "letters"; }
+  function say_number(core, force) {
+    var letters = core.split('"').join("").split("'").join("");
+    if (mode() === "numbers" && !force) { var n = gem(letters); if (n !== null) return yi_num_ab(n).split(" ").map(function (w) { return "!" + w; }); }
+    return letters.split("").map(function (c) { return "!" + LETTER_NAME[_BASE[c] || c]; });
+  }
+  function normalize(t) {
+    t = t.replace(/([\u05d0-\u05ea])[״”“„‟″](?=[\u05d0-\u05ea])/g, '$1"');
+    t = t.replace(/([\u05d0-\u05ea])[׳’‘′`]/g, "$1'");
+    t = t.split("״").join('"').split("׳").join("'");
+    for (var k = 0; k < 4; k++) {
+      var t2 = t.replace(/(^|[^\u05d0-\u05ea'"])([\u05d0-\u05ea]{1,2}(?:"[\u05d0-\u05ea])?'?):(?=[\u05d0-\u05ea])/g, "$1$2: ");
+      if (t2 === t) break; t = t2;
+    }
+    return t;
+  }
+  var _LEAD = "([{\"'«„“‘-–—", _TRAIL = ".,:;!?)]}»…-–—\"'";
+  function split_tok(tok) {
+    var i = 0; while (i < tok.length && _LEAD.indexOf(tok[i]) >= 0) i++;
+    var j = tok.length; while (j > i && _TRAIL.indexOf(tok[j - 1]) >= 0) j--;
+    var lead = tok.slice(0, i), core = tok.slice(i, j), trail = tok.slice(j);
+    if (trail.slice(0, 1) === "'" && core && isHeb(core[core.length - 1]) && lead.indexOf("'") < 0 && lead.indexOf('"') < 0) { core = core + "'"; trail = trail.slice(1); }
+    return [lead, core, trail];
+  }
+  var PREFIX = "ובדלמכשה";
+  function _phon_prefix(p, nxt) {
+    var out = "";
+    for (var k = 0; k < p.length; k++) {
+      var c = p[k], follow = k + 1 < p.length ? p[k + 1] : (nxt ? nxt[0] : "");
+      if (c === "ו") out += (k === 0 && follow !== "" && "במפ".indexOf(follow) >= 0) ? "או" : "ווע";
+      else if (c === "ה") out += "הא";
+      else if (c === "כ") out += "ק" + ((k === p.length - 1 && (nxt.slice(0, 1) !== "" && "אע".indexOf(nxt.slice(0, 1)) >= 0)) ? "" : "ע");
+      else out += c + ((k === p.length - 1 && (nxt.slice(0, 1) !== "" && "אע".indexOf(nxt.slice(0, 1)) >= 0)) ? "" : "ע");
+    }
+    return out;
+  }
+  function _with_prefix(p, words) {
+    if (!p) return words.slice();
+    var w0 = words[0];
+    if (w0[0] === "!") return ["!" + _phon_prefix(p, w0.slice(1)) + w0.slice(1)].concat(words.slice(1));
+    return [p + w0].concat(words.slice(1));
+  }
+  // ----- ר"ה: ראש השנה or רב הונא by context (port of abbrev.py rh_reading, kaggle-2.12; rule documented there) -----
+  var RH_RE = /^([ובדלמכשה]{0,2})ר"ה$/;
+  var RH_REF_BEFORE = setOf(["מסכת", "במסכת", "ממסכת", "ומסכת", "דמסכת", "למסכת", "מס'", "במס'", "מס", "גמרא", "גמ'", "בגמ'", "בגמרא"]);
+  var RH_CAL_BEFORE = setOf(["ערב", "בערב", "עריו", "של", "פון", "נאך", "ביז", "פאר", "פארן", "אום", "ביי", "פאר'ן", "תפילות", "תפלות", "תפילת",
+    "תפלת", "מוסף", "מחזור", "ימים", "גוטן", "גוטער", "גוטע", "קומענדיגן", "פאריגן", "יעדן", "דעם", "שבת", "יום", "ראשון", "שני"]);
+  var RH_CAL_AFTER = setOf(['ויוה"כ', 'ויוהכ"פ', "ויום", "יום", "און", "שופר", "תקיעות", "סעודה", "צייט", "פארנאכט", "ביינאכט", "אינדערפרי",
+    "דאווענען", "מחזור", "קומט", "איז", "וועט", 'תשפ"ז', 'תשפ"ח', "שנה"]);
+  var RH_SPEAKER_BEFORE = setOf(["אמר", "ואמר", "דאמר", "כדאמר", "אמרי", 'א"ר', 'וא"ר', 'דא"ר', 'כדא"ר', 'א"ל', 'וא"ל', "תני", "ותני", "דתני",
+    "תנא", "משמיה", "קמיה", "מיניה", "בעא", "בעי", "איתיביה", "מתקיף", "אתקיף", "אותביה", "בריה", "תלמידיה", "דרש", "ודרש"]);
+  var RH_SPEAKER_AFTER = setOf(["אמר", "ואמר", "סבר", "קסבר", "מתני", "דרש", "בעי", "בעא", "איקלע", "אמרה"]);
+  function rh_reading(prefix, prev, nxt, near, names, markers, ab) {
+    function is_mas(w) {
+      if (!w || RH_RE.test(w)) return false;
+      var ps = ["", "ב", "ד", "ו", "ל", "מ", "וב"];
+      for (var q = 0; q < ps.length; q++) {
+        var p = ps[q]; if (p && w.slice(0, p.length) !== p) continue;
+        var r = w.slice(p.length), lst = has(names, r) ? names[r] : [];
+        for (var z = 0; z < lst.length; z++) if (lst[z][0].length === 1 && lst[z][1] === "M") return true;
+        if (has(ab, r) && ab[r][1] === "M" && r.indexOf('"') >= 0) return true;
+      }
+      return false;
+    }
+    if (has(RH_REF_BEFORE, prev) || has(markers, nxt) || nxt === 'ע"א' || nxt === 'ע"ב' || (nxt && gem(nxt) !== null && (nxt.indexOf('"') >= 0 || nxt.slice(-1) === "'"))) return "reference";
+    if ((prefix && "בלשמה".indexOf(prefix.slice(-1)) >= 0) || has(RH_CAL_BEFORE, prev)) return "calendar";
+    if (has(RH_SPEAKER_BEFORE, prev) || has(RH_SPEAKER_AFTER, nxt) || (prefix === "ד" && ["משמיה", "בריה", "תלמידיה", "קמיה", "בשמיה"].indexOf(prev) >= 0)) return "rav-huna";
+    for (var y = 0; y < near.length; y++) if (is_mas(near[y])) return "reference";
+    if (has(RH_CAL_AFTER, nxt)) return "calendar";
+    return "default";
+  }
+
+  // ----- 2.14 context rules for two-meaning abbreviations (port of abbrev.py ctx_say; rule documented there) -----
+  var CTX_BASES = setOf(['ס"ד', 'א"א', 'ב"ר', 'ג"ע', 'כמ"ש', 'ל"ש', 'מ"ש', "ע'", 'ע"ה', 'ע"ז', 'ע"כ', 'ר"א', 'ר"ל', 'ת"ח', 'ב"י', 'ד"א',
+    'ה"ה', 'ע"ד', 'ע"פ', 'ע"ש', 'ב"ש', 'מ"מ', 'פ"ק', 'ר"ח', 'ר"י', 'ר"מ', 'ר"ש', 'ר"ת', 'ת"ל']);
+  var SIYATA = ["!סיאַטאַ", "!דישמאַיאַ"];
+  var SD_GEMARA_BEFORE = setOf(["הוה", "הוי", "קא", "וקא", "דקא", 'קס"ד', 'הו"א', "סלקא", "דהוה", "והוה", "לא", "ולא"]);
+  var SD_SIYATA_BEFORE = setOf(["מיט", "מיטן", "בעזרת", "דורך", "מיט'ן", 'בעזהשי"ת', 'בעזה"י', "בעזרה"]);
+  var YI_ART = setOf(["דער", "דעם", "די", "דאס", "א", "אן", "מיין", "זיין", "אייער", "אונזער", "זייער", "יענע", "יענער", "יענעם"]);
+  var FEM = setOf(["אמו", "אמי", "אמנו", "באבע", "באבי", "מאמע", "מוטער", "שוויגער", "אשתו", "זוגתו", "זוגתי", "ווייב", "שרה", "רבקה", "רחל", "לאה",
+    "מרים", "אסתר", "חנה", "רות", "יוכבד", "בתיה", "דבורה", "יהודית", "שרה'ס", "אמה", "הצדקנית", "הצדקת", "בתו", "בתי"]);
+  var TIME_AFTER = setOf(["נאך", "נאכן", "חצות", "ביינאכט", "אינדערפרי", "פארטאגס", "נאכמיטאג", "נאכמיטאגס", "פארנאכט", "פארנאכטס", "בייטאג",
+    "פרימארגן", "פרי", "שפעט", "צונאכטס", "קוגל", "טיש", "סעודה", "בבוקר", "אחר", 'אחה"צ', "קודם"]);
+  var TIME_BEFORE = setOf(["אום", "ביז", "ביזן", "יעדן", "יעדער", "יעדע", "יעדען", "נעכטן", "היינט", "פארגאנגענעם", "קומענדיגן", "פרייטאג"]);
+  var RABBI = setOf(["ר'", "רבי", "רב", "ר", "דר'", "ור'", "כר'", "לר'", "מר'", "אר'"]);
+  var PASUK_BI = setOf(["ויצאו", "ויסעו", "ויאמרו", "וילכו", "ויעשו", "ויבאו", "ויאנחו", "ויבכו", "ויחנו", "ויקחו", "וישבו", "ויראו", "ויאמינו",
+    "ויזעקו", "ויצעקו", "כל", "את", "אל", "ודבר", "דבר", "נשיאי", "עדת", "כנגד", "ואת", "ואל", "וידבר", "ויעבדו"]);
+  var HH_NEXT = setOf(["הרב", "הגאון", "הר'", "ר'", 'הרה"ג', 'הרה"ח', 'הרה"צ', 'הגה"צ', 'הגה"ק', "החתן", "הבחור", "ידידי", "האברך", "הצדיק",
+    'הה"ג', "הרבני", "החסיד", 'הבה"ח', 'הרה"ק', 'כ"ק', 'האדמו"ר', "מרן", "רבינו", "רבי"]);
+  var TH_NEXT = setOf(["פאר", "פארן", "פאר'ן", "פיל", "אסאך", "פילמאל", "גרויס", "אויף", "פארט", "פאר'ט", "רבה", "רבות", "פאר׳ן"]);
+  var EK_KASHE = setOf(["קשה", "וקשה", "קשיא", "וקשיא", "ק'", "הקשה", "והקשה", "ותמה", "ותימה", "תימה", "להקשות", 'ויל"ע', "ויש", "ועוד"]);
+  var AUTHOR_PLAIN = setOf(['רש"י', "תוס'", "התוס'", "רבינו", "הגמ'", "הגמרא"]);
+  function _is_author(t) {
+    if (!t) return false;
+    if (has(AUTHOR_PLAIN, t)) return true;
+    return t[0] === "ה" && t.length > 3 && (t.slice(1, -1).indexOf('"') >= 0 || t.slice(-1) === "'") && ['ה"ה', 'הנ"ל', "הל'", 'הי"ד'].indexOf(t) < 0;
+  }
+  function _yi_word(w) { return _yi_like(_core(w)); }
+  function _lang(words) {
+    var cores = words.filter(function (w) { return HEB_RE.test(w); }).map(_core)
+      .filter(function (c) { return c && !has(REF_WORDS, c) && c.indexOf('"') < 0 && c.slice(-1) !== "'"; });
+    var yi = 0, he = 0; cores.forEach(function (c) { if (_yi_like(c)) yi++; if (_he_like(c) && !_yi_like(c)) he++; });
+    return yi > he ? "yi" : he > yi ? "lk" : null;
+  }
+  function inA(x, a) { return a.indexOf(x) >= 0; }
+  function ctx_say(base, p, prev, prev2, nxt, nxt2, first, lang) {
+    if (base === 'ס"ד') {
+      if (inA(nxt, ["אמינא", "אמינה", "דהא"]) || (nxt.slice(0, 1) === "ד" && nxt.length > 2) || has(SD_GEMARA_BEFORE, prev) || p.indexOf("ו") >= 0 || p.indexOf("ד") >= 0) return null;
+      if (has(SD_SIYATA_BEFORE, prev) || p === "ב" || first || !nxt || lang === "yi") return SIYATA;
+      return null;
+    }
+    if (base === 'א"א') {
+      if (inA(nxt, ['ע"ה', "אבינו", 'ע"ה,', "עליו", 'אע"ה']) || nxt.indexOf('ע"ה') === 0) return ["!אווראהאם", "!אווינע"];
+      if (inA(nxt, ["תחנון", "למנצח", "הלל", "אבינו", "צדקתך", "קל", "יזכור", "וידוי", "סליחות", "ויהי", "לדוד", "כאן", "אותו"]) ||
+          (prev && (prev.indexOf('ר"ח') >= 0 || inA(prev, ["בשבת", 'ביו"ט', "בחנוכה", "בפורים", 'ובר"ח', 'בר"ח'])))) return ["!איין", "!אוימרים"];
+      return null;
+    }
+    if (base === 'ב"ר') return (has(RABBI, prev2) && !inA(nxt, ["פרשה", "פ'", "פרשת", "פר'"])) ? ["בן", "רבי"] : null;
+    if (base === 'ג"ע') {
+      var g = ['ע"ז', 'וע"ז', 'ש"ד', 'וש"ד', "ושפיכות", "שפיכות", "עבודה", "ועבודה"];
+      return [prev, prev2, nxt, nxt2].some(function (x) { return inA(x, g); }) ? ["!גילוי", "!עראַיעס"] : null;
+    }
+    if (base === 'כמ"ש') return _is_author(nxt) ? ["כמו", "שכתב"] : null;
+    if (base === 'ל"ש') return lang === "yi" ? ["!לוי", "!שייעך"] : null;
+    if (base === 'מ"ש') {
+      if (inA(prev, ["עיין", "ועיין", "ע'", "וע'", "עי'", "ועי'", "וראה", "ראה", "לפי", "כפי"]) || _is_author(nxt)) return ["מה", "שכתב"];
+      if (lang === "yi" && !inA(nxt, ["הכא", "התם", "דהכא", "דהתם"]) && (!nxt || has(TIME_AFTER, nxt) || _yi_word(nxt))) return ["!מויצאי", "!שאבעס"];
+      return null;
+    }
+    if (base === "ע'") return inA(nxt, ["פנים", "שנה", "שנים", "אומות", "לשון", "זקנים", "נפש", "יאר", "פרים", "לשונות"]) ? ["!שיוועים"] : null;
+    if (base === 'ע"ה') {
+      if (inA(prev, ["לא", "ולא", "א", "אן", "גרויסער", "גרויסן", "שאין", "ואין", "אין"]) || inA(nxt, ["חסיד", "גמור", "גמורים"])) return ["עם", "הארץ"];
+      if (has(FEM, prev)) return ["עליה", "השלום"];
+      return null;
+    }
+    if (base === 'ע"ז') return (lang !== "yi" && (has(EK_KASHE, prev) || inA(nxt, ["מהא", "דהא", "מהך", "דהרי", "מדברי", "מן", "מה"]))) ? ["על", "זה"] : null;
+    if (base === 'ע"כ') {
+      if (inA(prev, ["אלא", "ואלא"]) || startsAny(nxt, ['צ"ל', "צריך"])) return null;
+      if (inA(nxt, ["ל'", "לשון", "לשונו", "דבריו", "דברי", 'ל"ה', 'ל"ק', "תוכן"]) || !nxt) return ["!אד", "!קאן"];
+      if (lang === "yi" || first) return ["על", "כן"];
+      return null;
+    }
+    if (base === 'ר"א') return (nxt === "בן" && inA(nxt2, ["עזריה", "ערך", "שמוע", "פדת", "חסמא", "יוסי", "צדוק"])) ? ["רבי", "אלעזר"] : null;
+    if (base === 'ר"ל') return (lang === "yi" && !inA(nxt, ["אז", "דאס", "דהיינו", "מ'מיינט", "מען", "ד.ה.", "אַז"])) ? ["רחמנא", "ליצלן"] : null;
+    if (base === 'ת"ח') return has(TH_NEXT, nxt) ? ["!טשואעס", "!כיין"] : null;
+    if (base === 'ב"י') return (has(PASUK_BI, prev) || inA(nxt, ["ממצרים", "ממצרים.", "במדבר", "בתוך", "לאמר"])) ? ["בני", "ישראל"] : null;
+    if (base === 'ד"א') return (inA(nxt, ["קדמה", "קודם"]) || lang === "yi") ? ["דרך", "ארץ"] : null;
+    if (base === 'ה"ה') return has(HH_NEXT, nxt) ? ["!האַלוי", "!הי"] : null;
+    if (base === 'ע"ד') return has(YI_ART, nxt) ? ["על", "דבר"] : null;
+    if (base === 'ע"פ' || base === 'ע"ש') return (has(TIME_AFTER, nxt) || has(TIME_BEFORE, prev)) ? ["ערב", base === 'ע"פ' ? "פסח" : "שבת"] : null;
+    if (base === 'ב"ש') return (inA(prev, ["דער", "דעם"]) || inA(nxt, ["אויף", "על", 'ס"ק', 'אה"ע', 'באה"ע']) || nxt.indexOf('סק"') === 0) ? ["בית", "שמואל"] : null;
+    if (base === 'מ"מ') return (inA(prev, ["דער", "דעם", "א", "אלס", "זיין", "ווי", "און"]) && lang !== "lk") ? ["!מעמאלע", "!מוקעם"] : null;
+    if (base === 'פ"ק') return (inA(prev, ["אין", "דא", "פון", "היר", "אינעם"]) && lang === "yi") ? ["!פוי", "!קהילע"] : null;
+    if (base === 'ר"ח') {
+      if (inA(prev, ["כתב", "וכתב", "פירש", "ופירש", "פי'", "ופי'", "כפירוש", "גירסת", "וגירסת", "דעת", "ודעת", "שיטת", "לשיטת"]) || inA(nxt, ['ז"ל', "פירש", "פי'", "כתב", "גריס"])) return null;
+      if (inA(p, ["ב", "ל", "ש", "מ", "וב", "ול", "דב", "דל"]) || lang === "yi" || inA(prev, ["ערב", "מוצאי"]) || inA(nxt, ['א"א', "אין", "חל", "שחל", "בשבת"])) return ["!רויש", "!חודש"];
+      return null;
+    }
+    if (base === 'ר"י') return (inA(nxt, ["אומר", "אומרים", "מתיר", "אוסר", "מחייב", "פוטר", "מכשיר", "פוסל"]) && !inA(prev, ["ואומר", "אומר"])) ? ["רבי", "יהודה"] : null;
+    if (base === 'ר"מ') return (inA(prev, ["דער", "דעם", "א", "זיין", "אונזער", "מיין", "אלס"]) && lang !== "lk") ? ["!רויש", "!מעסיווטע"] : null;
+    if (base === 'ר"ש') return (inA(prev, ["דער", "דעם"]) && lang !== "lk") ? ["!ראביינע", "!שימשען"] : null;
+    if (base === 'ר"ת') return (inA(prev, ["די", "א", "דאס", "זיין", "אלס", "ווי"]) || nxt === "פון") ? ["!רוישע", "!טייוועס"] : null;
+    if (base === 'ת"ל') return lang === "yi" ? ["!טוידע", "!לאַקעל"] : null;
+    return null;
+  }
+  function expand(text) {
+    var ab = D.ab, names = D.names, markers = D.markers;
+    var toks = pysplit(normalize(text)), out = [];
+    var ctx = { kind: null, left: 0, nums: 0 }, paren = 0;
+    function emit(words) {
+      var ws = words.filter(function (w) { return w; }), lead = arguments[1], trail = arguments[2];
+      for (var k = 0; k < ws.length; k++) {
+        var w = ws[k], prot = w[0] === "!"; if (prot) w = w.slice(1);
+        if (k === 0) w = lead + w; if (prot) w = w + PROT; if (k === ws.length - 1) w = w + trail;
+        out.push(w);
+      }
+    }
+    function set_ctx(kind, left) { ctx.kind = kind; ctx.left = left; ctx.nums = 0; }
+    function count(s, c) { return s.split(c).length - 1; }
+    var i = 0, m;
+    while (i < toks.length) {
+      var tok = toks[i];
+      if (tok.indexOf(PROT) >= 0) { out.push(tok); i++; continue; }
+      var st = split_tok(tok), lead = st[0], core = st[1], trail = st[2];
+      var in_paren = (paren + count(lead, "(")) > 0;
+      paren = Math.max(0, paren + count(lead, "(") - count(trail, ")"));
+      var nxt = i + 1 < toks.length ? split_tok(toks[i + 1])[1] : "";
+      var prev = i > 0 ? split_tok(toks[i - 1])[1] : "";
+      var has_mark = core.slice(1, -1).indexOf('"') >= 0 || core.slice(-1) === "'";
+      var live = ctx.left > 0;
+      if (!core) { out.push(tok); i++; continue; }
+      // 1. names
+      var hit = null, pfx = ["", "ב", "ד", "מ", "ל", "ו", "כ", "וב"];
+      for (var a = 0; a < pfx.length && !hit; a++) {
+        var p = pfx[a]; if (p && core.indexOf(p) !== 0) continue;
+        var first = core.slice(p.length), cand = has(names, first) ? names[first] : [];
+        for (var b = 0; b < cand.length; b++) {
+          var ws = cand[b][0], typ = cand[b][1], kk = ws.length;
+          if (i + kk > toks.length) continue;
+          var ok = first === ws[0];
+          for (var mm = 1; mm < kk && ok; mm++) ok = split_tok(toks[i + mm])[1] === ws[mm];
+          for (var m2 = 0; m2 < kk - 1 && ok; m2++) ok = !split_tok(toks[i + m2])[2];
+          if (ok) { hit = [kk, typ]; break; }
+        }
+      }
+      if (hit) {
+        if (ctx.kind === "refname" && live) { for (var q = 0; q < hit[0]; q++) out.push(toks[i + q]); ctx.left -= 1; i += hit[0]; continue; }
+        for (var q2 = 0; q2 < hit[0]; q2++) out.push(toks[i + q2]);
+        set_ctx(hit[1] === "M" ? "masechta" : "book", hit[1] === "M" ? 1 : 2);
+        if (split_tok(toks[i + hit[0] - 1])[2].indexOf(")") >= 0) set_ctx(null, 0);
+        i += hit[0]; continue;
+      }
+      // 2. markers
+      var mk = null, mp = ["", "ב", "ו", "וב", "ד", "ל", "מ", "ש", "כ"];
+      for (var c1 = 0; c1 < mp.length; c1++) { var pp = mp[c1]; if (core.indexOf(pp) === 0 && has(markers, core.slice(pp.length))) { mk = [pp, core.slice(pp.length)]; break; } }
+      if (mk && mk[1] === "פ'" && has(PARSHA, nxt)) { emit(_with_prefix(mk[0], ["פרשת"]), lead, trail); i++; continue; }
+      if (mk) {
+        var say = markers[mk[1]][0], ty = markers[mk[1]][1];
+        emit(_with_prefix(mk[0], say), lead, trail);
+        set_ctx({ daf: "daf", amud: "amud", refname: "refname" }[ty] || "ref", ty === "refname" ? 3 : 1); i++; continue;
+      }
+      if (core === 'ע"א' || core === 'ע"ב') { emit(["עמוד", "!" + LETTER_NAME[core.slice(-1) === "א" ? "א" : "ב"]], lead, trail); set_ctx(null, 0); i++; continue; }
+      if (ctx.kind === "ref2" && live) {
+        m = core.match(/^([המס])"([א-ת]{1,2})$/);
+        if (m && gem(m[2]) !== null) { emit([{ "ה": "הלכה", "מ": "משנה", "ס": "סעיף" }[m[1]]].concat(say_number(m[2])), lead, trail); set_ctx(null, 0); i++; continue; }
+      }
+      // 3. numbers in a reference
+      var n_ok = gem(core) !== null;
+      if (live && n_ok && ["refname", "amudonly", "ref2"].indexOf(ctx.kind) < 0 && !(ctx.kind === "masechta" && RH_RE.test(core))) {   // no daf ר"ה (205): "שבת, ר"ה, יומא" is a list
+        var bare = !has_mark, t0 = trail.slice(0, 1);
+        var perek_like = ctx.kind === "masechta" && /^פ"[א-ת]{1,2}$/.test(core) && !(t0 !== "" && ".:".indexOf(t0) >= 0) && nxt !== 'ע"א' && nxt !== 'ע"ב';
+        var allow = (!perek_like) && ((!bare) || (core.split("'").join("").length === 1) || (in_paren && (ctx.kind === "masechta" || ctx.kind === "book")) ||
+          (["daf", "ref", "amud"].indexOf(ctx.kind) >= 0 && !has(STOP_BARE, core) && ((t0 !== "" && ".,:;)".indexOf(t0) >= 0) || has(markers, nxt) || nxt === 'ע"א' || nxt === 'ע"ב' || !nxt)));
+        if (allow) {
+          var words = say_number(core), first_num = ctx.nums === 0, amud = null;
+          if (first_num && (ctx.kind === "daf" || ctx.kind === "masechta") && t0 !== "" && ".:".indexOf(t0) >= 0) {
+            amud = ["עמוד", "!" + LETTER_NAME[trail[0] === "." ? "א" : "ב"]];
+            var rest = trail.slice(1), end_mark = rest ? rest : (i === toks.length - 1 ? "." : ",");
+            emit(words.concat(amud), lead, end_mark);
+          } else emit(words, lead, trail);
+          ctx.nums += 1;
+          var keep = ctx.kind === "book" && ctx.nums < 2 && trail.indexOf(")") < 0;
+          ctx.left = keep ? 1 : ((ctx.kind === "daf" || ctx.kind === "masechta") && !amud ? 1 : 0);
+          if (ctx.left && (ctx.kind === "daf" || ctx.kind === "masechta")) ctx.kind = "amudonly";
+          i++; continue;
+        }
+      }
+      if (ctx.kind === "refname") ctx.left -= 1;
+      else if (ctx.kind === "amudonly" && core !== 'ע"א' && core !== 'ע"ב') set_ctx(null, 0);
+      else if (live && core !== 'ע"א' && core !== 'ע"ב') set_ctx(null, 0);
+      // 4. context words
+      if (core === "שם" && (lead.indexOf("(") >= 0 || trail.indexOf(")") >= 0 || has(markers, nxt) || nxt === 'ע"א' || nxt === 'ע"ב' || startsAny(nxt, ["בפסוק", 'בד"ה', 'ד"ה']) ||
+          ["עיין", "ועיין", "עי'", "ע'", "ועי'"].indexOf(prev) >= 0 || (nxt && gem(nxt) !== null && (nxt.indexOf('"') >= 0 || nxt.slice(-1) === "'")))) {
+        emit(["!שאם"], lead, trail); set_ctx("book", 2); i++; continue;
+      }
+      if (core === 'ב"ה') {
+        var near = toks.slice(Math.max(0, i - 6), i + 7).map(function (t) { return split_tok(t)[1]; }), wds;
+        if (has(GOD, prev) || has(GOD, prev.slice(1)) || has(GOD, prev.slice(2)) || (pin(prev.slice(0, 1), PREFIX) && has(GOD, "ה" + prev.slice(1)))) wds = ["!בורעך", "!הו"];
+        else if (near.indexOf('ב"ש') >= 0 || near.indexOf('וב"ש') >= 0) wds = has(ab, 'ב"ה') ? ab['ב"ה'][0] : ["!בייס", "!הילל"];
+        else wds = ["!בורעך", "!השם"];
+        emit(wds, lead, trail); i++; continue;
+      }
+      if (core === 'ר"ח' && (has(MONTHS, nxt) || ["ערב", "אום", "ביז", "פאר", "נאך", "ביי"].indexOf(prev) >= 0)) { emit(["!רויש", "!חודש"], lead, trail); i++; continue; }
+      m = core.match(RH_RE);
+      if (m) {                                         // ר"ה by context (rh_reading; kaggle-2.12, Jacob Nov 1: "depends")
+        var which = rh_reading(m[1], prev, nxt, toks.slice(Math.max(0, i - 3), i + 4).map(function (t) { return split_tok(t)[1]; }), names, markers, ab);
+        if (which === "rav-huna") { emit(_with_prefix(m[1], ["רב", "הונא"]), lead, trail); set_ctx(null, 0); }
+        else { emit(_with_prefix(m[1], has(ab, 'ר"ה') ? ab['ר"ה'][0] : ["ראש", "השנה"]), lead, trail); if (which === "calendar") set_ctx(null, 0); else set_ctx("masechta", 1); }
+        i++; continue;
+      }
+      m = core.match(/^([ובדלמכשה]{0,2})ה'$/);
+      if (m) { emit(_with_prefix(m[1], ["!השם"]), lead, trail); i++; continue; }
+      // 4b. 2.14 context rules (ctx_say)
+      if (has_mark) {
+        var cs = null;
+        for (var kc = 0; kc <= 2; kc++) {
+          var pc = core.slice(0, kc), bc = core.slice(kc), badc = false;
+          for (var zc = 0; zc < pc.length; zc++) if (PREFIX.indexOf(pc[zc]) < 0) badc = true;
+          if (kc && (badc || has(ab, core) || has(markers, core) || (has(ab, core.slice(1)) && kc === 2))) break;
+          if (has(CTX_BASES, bc)) {
+            var prev2c = i > 1 ? split_tok(toks[i - 2])[1] : "", nxt2c = i + 2 < toks.length ? split_tok(toks[i + 2])[1] : "";
+            var firstc = i === 0 || ".:!?".indexOf(split_tok(toks[i - 1])[2].slice(-1) || "#") >= 0;
+            var winc = toks.slice(Math.max(0, i - 6), i).concat(toks.slice(i + 1, i + 7));
+            cs = ctx_say(bc, pc, prev, prev2c, nxt, nxt2c, firstc, _lang(winc));
+            if (cs) { emit(_with_prefix(pc, cs), lead, trail); set_ctx(null, 0); }
+            break;
+          }
+        }
+        if (cs) { i++; continue; }
+      }
+      // 5. patterns
+      m = core.indexOf('"') >= 0 ? core.match(/^([ובדלמכש]{0,2})פ("?)([א-ת]{1,2})$/) : null;
+      if (m && !has(ab, core) && !has(ab, core.slice(m[1].length)) && gem(m[3]) !== null) {
+        emit(_with_prefix(m[1], ["פרק"]).concat(say_number(m[3])), lead, trail); set_ctx("ref2", 1); i++; continue;
+      }
+      m = core.match(/^([ובדלמכש]{0,2})סק"([א-ת]{1,3})$/);
+      if (m && gem(m[2]) !== null) { emit(_with_prefix(m[1], ["סעיף", "קטן"]).concat(say_number(m[2])), lead, trail); i++; continue; }
+      // 6. abbreviation table
+      if (has(ab, core) && has_mark) {
+        var sy = ab[core][0], kd = ab[core][1];
+        emit(sy, lead, trail);
+        set_ctx({ M: "masechta", B: "book" }[kd] || null, kd === "M" ? 1 : kd === "B" ? 2 : 0);
+        if (['או"ח', 'יו"ד', 'אה"ע', 'חו"מ', 'מ"ב', 'ח"א', 'ח"ב', 'ח"ג', 'ח"ד', 'ח"ה'].indexOf(core) >= 0) set_ctx("ref", 1);
+        i++; continue;
+      }
+      var done = false;
+      if (has_mark) {
+        for (var k3 = 1; k3 <= 3; k3++) {
+          var p3 = core.slice(0, k3), rest3 = core.slice(k3), bad = false;
+          for (var z = 0; z < p3.length; z++) if (PREFIX.indexOf(p3[z]) < 0) bad = true;
+          if (rest3.length < 2 || bad) break;
+          if (has(ab, rest3) && (rest3.slice(1, -1).indexOf('"') >= 0 || rest3.slice(-1) === "'")) {
+            var sy3 = ab[rest3][0], kd3 = ab[rest3][1];
+            emit(_with_prefix(p3, sy3), lead, trail);
+            set_ctx({ M: "masechta", B: "book" }[kd3] || null, kd3 === "M" ? 1 : kd3 === "B" ? 2 : 0);
+            done = true; break;
+          }
+        }
+      }
+      if (done) { i++; continue; }
+      // 7. a Hebrew-letter number on its own
+      if (has_mark && n_ok && (core.indexOf('"') >= 0 || core.split("'").join("").length === 1)) { emit(say_number(core), lead, trail); i++; continue; }
+      if (has_mark && PREFIX.indexOf(core[0]) >= 0) {
+        var r7 = core.slice(1);
+        if (gem(r7) !== null && (r7.indexOf('"') >= 0 || r7.split("'").join("").length === 1)) { emit(_with_prefix(core[0], say_number(r7)), lead, trail); i++; continue; }
+      }
+      out.push(tok); i++;
+    }
+    return out.join(" ");
+  }
+  // ---------- לשון קודש marks (lk.py, vowels off) ----------
+  function _core(w) { return strip(w, ".,?!:;\"'()[]{}״׳-–—").split(PROT).join(""); }
+  function _he_like(c) { return has(HE_FW, c) || (c.length > 2 && c[0] === "ו" && c[1] !== "ו"); }
+  function _yi_like(c) {
+    return has(YI_FW, c) || c.indexOf("וו") >= 0 || c.indexOf("יי") >= 0 || c.indexOf("ײ") >= 0 || c.indexOf("ױ") >= 0 || c.indexOf("\u05b7") >= 0 || c.indexOf("\u05b8") >= 0 ||
+      (c.indexOf("גע") === 0 && c.length > 4 && "טן".indexOf(c[c.length - 1]) >= 0) || endsAny(c, ["ען", "ערן", "עלן", "קייט", "ונג"]);
+  }
+  var HEB_RE = /[\u05d0-\u05ea]/;
+  function score(words) {
+    var cores = words.filter(function (w) { return HEB_RE.test(w) && w.indexOf(PROT) < 0; }).map(_core).filter(function (c) { return !has(REF_WORDS, c); });
+    var yi = 0, he = 0; cores.forEach(function (c) { if (_yi_like(c)) yi++; if (_he_like(c) && !_yi_like(c)) he++; });
+    return [cores.length, yi, he];
+  }
+  function is_lk_words(words) {
+    var s = score(words), n = s[0], yi = s[1], he = s[2];
+    if (n < 3) return null;
+    if (yi === 0 && (n >= 4 || he >= 1)) return true;
+    return he >= 2 * yi + 3;
+  }
+  function segments(text) {
+    var parts = text.replace(/^\s+|\s+$/g, "").replace(/([.!?:;,])\s+/g, "$1\u0001").split("\u0001").filter(function (p) { return p; });
+    var flags = parts.map(function (p) { return is_lk_words(pysplit(p)); });
+    var num = 0, den = 0; flags.forEach(function (f, k) { if (f !== null) { den += parts[k].length; if (f) num += parts[k].length; } });
+    var share = num / Math.max(1, den);
+    if (share >= 0.6) flags = flags.map(function (f, k) { return (f === false && score(pysplit(parts[k]))[1] === 0) ? true : f; });
+    for (var k = 0; k < flags.length; k++) {
+      if (flags[k] === null) {
+        var pv = null, nx = null, j;
+        for (j = k - 1; j >= 0; j--) if (flags[j] !== null) { pv = flags[j]; break; }
+        for (j = k + 1; j < flags.length; j++) if (flags[j] !== null) { nx = flags[j]; break; }
+        flags[k] = pv !== null ? pv : (nx !== null ? nx : false);
+      }
+    }
+    return parts.map(function (p, k) { return [p, !!flags[k]]; });
+  }
+  function _mark(w) { var m = w.match(/[.,?!:;)\]}"'»…]*$/), k = m ? m.index : w.length; return w.slice(0, k) + LKM + w.slice(k); }
+  function lk_pass(text) {
+    var res = [];
+    segments(text).forEach(function (s) {
+      if (s[1]) res.push(pysplit(s[0]).map(function (w) {        // vowels off: typed spelling + word list, except the heimish forms in LK_COMMON
+        if (w.indexOf(PROT) >= 0 || !HEB_RE.test(w)) return w;
+        var lead = w.match(/^[(\[{"'«„“]*/)[0], rest = w.slice(lead.length), trail = rest.match(/[.,?!:;)\]}"'»…]*$/)[0];
+        var core = trail ? rest.slice(0, rest.length - trail.length) : rest, lc = D.lk_common || {};
+        var rep = has(lc, core) ? lc[core].replace(/[\u05b4\u05b7\u05b8]/g, "").split("ײַ").join("יי").split("ײ").join("יי").split("ױ").join("וי") : "";
+        return rep ? lead + rep + PROT + LKM + trail : _mark(w);
+      }).join(" "));
+      else res.push(s[0]);
+    });
+    return res.join(" ");
+  }
+  function pre_tts(t) { return lk_pass(expand(t)); }
+  // ---------- respelling (accent.to_tts, expand=False) ----------
+  var _PUNCT = ".,?!:;\"'";
+  var _PPUNCT = _PUNCT + "()[]";   // phrase pass: brackets too (kaggle-2.13, (ראש השנה))
+  function to_tts(t) {
+    t = normalize(t);
+    var m = D.lex, phr = D.phr, maxn = 1, keys = Object.keys(phr);
+    keys.forEach(function (k) { maxn = Math.max(maxn, k.split(" ").length); });
+    var words = pysplit(t), out = [], i = 0;
+    while (i < words.length) {
+      var hit = null;
+      for (var n = Math.min(maxn, words.length - i); n > 1; n--) {
+        var seq = words.slice(i, i + n), cores = seq.map(function (w) { return strip(w, _PPUNCT); });
+        if (cores.some(function (c) { return !c; })) continue;
+        if (rstrip(seq[0], _PPUNCT) !== seq[0] || lstrip(seq[n - 1], _PPUNCT) !== seq[n - 1]) continue;
+        var bad = false; for (var q = 1; q < n - 1; q++) if (seq[q] !== cores[q]) bad = true; if (bad) continue;
+        var key = cores.map(function (c) { return c.split(LKM).join(""); }).join(" ");   // an LK mark does not block a phrase (2.13)
+        if (has(phr, key) && phr[key]) {
+          var lead = seq[0].slice(0, seq[0].length - lstrip(seq[0], _PPUNCT).length), trail = seq[n - 1].slice(rstrip(seq[n - 1], _PPUNCT).length);
+          hit = [n, lead + phr[key] + trail]; break;
+        }
+      }
+      if (hit) { out.push(hit[1].replace(MARKS_RE, "")); i += hit[0]; continue; }
+      var w = words[i]; i++;
+      if (w.indexOf(PROT) >= 0) { out.push(w.replace(MARKS_RE, "")); continue; }
+      w = w.split(LKM).join("");
+      var core = strip(w, ".,?!:;\"'()[]"), rep = has(m, core) ? m[core] : null;
+      out.push(rep ? w.split(core).join(rep) : w);
+    }
+    return out.join(" ").replace(MARKS_RE, "");
+  }
+  // ---------- the whole step: text -> [{tts, lk}] (one per sentence piece, as the box renders) ----------
+  function pieces(text) {
+    var parts = chunks(say_numbers(pre_tts(text)));
+    return parts.map(function (c) {
+      var ws = c.split(" ").filter(function (w) { return HEB_RE.test(w); });
+      var lkn = ws.filter(function (w) { return w.indexOf(LKM) >= 0; }).length;
+      return { tts: to_tts(c), lk: Math.round(100 * lkn / Math.max(1, ws.length)) / 100 };
+    });
+  }
+  var API = { init: init, pieces: pieces, say_numbers: say_numbers, chunks: chunks, expand: expand, lk_pass: lk_pass, pre_tts: pre_tts, to_tts: to_tts, normalize: normalize };
+  if (typeof module !== "undefined" && module.exports) module.exports = API; else root.KolText = API;
+})(typeof self !== "undefined" ? self : this);
+
+;if(typeof KolText==='undefined'&&self.KolText){var KolText=self.KolText;}
+/* Kol pocket voice: runs the small voice entirely on this device (Tab, Nov 1 2026).
+   Text step = pocket-text.js (same as the big voice); model = Piper-style VITS in ONNX, run by ONNX Runtime Web (wasm).
+   The model is fetched once in parts and kept in this browser's cache, so it works offline afterwards. */
+(function () {
+  "use strict";
+  var BASE = "/pocket/", CACHE = "kol-pocket-v1";
+  var LETTER = { "א": "ʔ", "ב": "b", "ג": "ɡ", "ד": "d", "ה": "h", "ו": "u", "ז": "z", "ח": "x", "ט": "t", "י": "i", "כ": "χ", "ך": "χ",
+    "ל": "l", "מ": "m", "ם": "m", "נ": "n", "ן": "n", "ס": "s", "ע": "ɛ", "פ": "p", "ף": "f", "צ": "ʦ", "ץ": "ʦ", "ק": "k", "ר": "ʁ", "ש": "ʃ", "ת": "θ" };
+  var MARK = { "\u05b7": "ɐ", "\u05b8": "ɒ", "\u05b9": "ɵ", "\u05ba": "ɵ", "\u05b4": "ɨ", "\u05bc": "ˑ", "\u05bf": "ː", "\u05c2": "ʂ",
+    "\u05b0": "ə", "\u05b5": "e", "\u05b6": "æ", "\u05bb": "ʊ", "\u05b2": "ɐ", "\u05b3": "ɒ", "\u05b1": "æ" };
+  var PUNCT = { " ": " ", ".": ".", ",": ",", "?": "?", "!": "!", ":": ":", ";": ";", "'": "'", "׳": "'", "\"": "\"", "״": "\"",
+    "(": ",", ")": ",", "-": " ", "־": " ", "–": ",", "—": "," };
+  var LIG = { "\u05f0": "וו", "\u05f1": "וי", "\u05f2": "יי", "\ufb1f": "יי\u05b7", "\ufb2e": "א\u05b7", "\ufb2f": "א\u05b8", "\ufb4b": "ו\u05b9",
+    "\ufb44": "פ\u05bc", "\ufb4e": "פ\u05bf", "\ufb31": "ב\u05bc", "\ufb4c": "ב\u05bf", "\ufb3b": "כ\u05bc", "\ufb2b": "ש\u05c2", "\ufb2a": "ש",
+    "\ufb4a": "ת", "\ufb35": "ו\u05bc", "\ufb1d": "י\u05b4" };
+  function symbols(text) {
+    var t = text.replace(/[\ue000-\ue00f]/g, "").normalize("NFD"), u = "", out = [];
+    for (var i = 0; i < t.length; i++) u += LIG[t[i]] || t[i];
+    for (var j = 0; j < u.length; j++) {
+      var c = u[j], s = LETTER[c] || MARK[c] || PUNCT[c];
+      if (s === undefined) continue;
+      if (s === " " && (!out.length || out[out.length - 1] === " ")) continue;
+      out.push(s);
+    }
+    while (out.length && out[out.length - 1] === " ") out.pop();
+    return out;
+  }
+  function ids(text, pim) {
+    var o = [pim["^"][0], pim["_"][0]], s = symbols(text);
+    for (var i = 0; i < s.length; i++) o.push(pim[s[i]][0], pim["_"][0]);
+    o.push(pim["$"][0]); return o;
+  }
+  var K = { symbols: symbols, ids: ids };
+  if (typeof module !== "undefined" && module.exports) { module.exports = K; return; }
+  window.KolTokens = K;
+  var $ = function (id) { return document.getElementById(id); };
+  var sess = null, cfg = null, SR = 22050, loading = null;
+  function status(t, cls) { var e = document.getElementById("pk-status"); if (e) { e.textContent = t; e.className = "pk-status " + (cls || ""); } if (window.KolPocketStatus) window.KolPocketStatus(t, cls); }
+  async function cachedFetch(url, onBytes) {
+    var c = null; try { c = await caches.open(CACHE); } catch (e) {}
+    if (c) { var hit = await c.match(url); if (hit) { var b = await hit.arrayBuffer(); onBytes && onBytes(b.byteLength); return b; } }
+    var r = await fetch(url, { cache: "no-cache" }); if (!r.ok) throw new Error("HTTP " + r.status + " " + url);
+    var reader = r.body && r.body.getReader ? r.body.getReader() : null, chunks = [], n = 0, buf;
+    if (reader) { for (;;) { var x = await reader.read(); if (x.done) break; chunks.push(x.value); n += x.value.length; onBytes && onBytes(x.value.length); }
+      buf = new Uint8Array(n); var o = 0; chunks.forEach(function (ch) { buf.set(ch, o); o += ch.length; }); buf = buf.buffer; }
+    else { buf = await r.arrayBuffer(); onBytes && onBytes(buf.byteLength); }
+    if (c) { try { await c.put(url, new Response(buf.slice(0))); } catch (e) {} }
+    return buf;
+  }
+  // SOURCE.get(name, version, onBytes) -> ArrayBuffer of "model/manifest.json", "pocket-text-data.json", "model/<part>".
+  // The page fetches from /pocket/ and keeps a copy in the Cache API; a userscript / extension swaps in its own source.
+  var SOURCE = { get: function (name, ver, onBytes) { return cachedFetch(BASE + name + (ver ? "?v=" + ver : ""), onBytes); }, wasmPaths: BASE + "ort/" };
+  // The engine (.wasm, ~10 MB) is published in small parts (the site takes files under 0.9 MB best); they are fetched once,
+  // kept in the cache like the model, and joined into one in-memory file. Only the build this device needs is fetched.
+  var SIMD = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]);
+  async function wasmPaths(threads) {
+    if (typeof SOURCE.wasmPaths !== "string") return SOURCE.wasmPaths;           // userscript / extension hand their own
+    var wm; try { wm = JSON.parse(new TextDecoder().decode(await SOURCE.get("ort/wasm-manifest.json", String(window.KOL_POCKET_V || 1)))); } catch (e) { return SOURCE.wasmPaths; }
+    var simd = false; try { simd = WebAssembly.validate(SIMD); } catch (e) {}
+    var name = "ort-wasm" + (simd ? "-simd" : "") + (threads ? "-threaded" : "") + ".wasm", f = wm.files[name];
+    if (!f) return SOURCE.wasmPaths;
+    var bufs = [], got = 0;
+    for (var i = 0; i < f.parts.length; i++) bufs.push(await SOURCE.get("ort/" + f.parts[i], f.sha.slice(0, 10), function (n) {
+      got += n; status("Loading the engine: " + Math.round(100 * got / f.bytes) + "% (first time only)"); }));
+    var url = URL.createObjectURL(new Blob(bufs, { type: "application/wasm" })), out = {};
+    ["ort-wasm.wasm", "ort-wasm-simd.wasm", "ort-wasm-threaded.wasm", "ort-wasm-simd-threaded.wasm"].forEach(function (k) { out[k] = url; });
+    return out;
+  }
+  async function load() {
+    if (loading) return loading;
+    loading = (async function () {
+      var t0 = performance.now();
+      var man = JSON.parse(new TextDecoder().decode(await SOURCE.get("model/manifest.json", String(window.KOL_POCKET_V || 1))));
+      cfg = man.config; SR = cfg.audio.sample_rate;
+      KolText.init(JSON.parse(new TextDecoder().decode(await SOURCE.get("pocket-text-data.json", man.text_version))));
+      var total = man.bytes, got = 0, parts = [];
+      for (var i = 0; i < man.parts.length; i++) {
+        parts.push(new Uint8Array(await SOURCE.get("model/" + man.parts[i], man.sha.slice(0, 10), function (n) {
+          got += n; status("Loading the voice: " + Math.round(100 * got / total) + "% of " + (total / 1048576).toFixed(0) + " MB (first time only)");
+        })));
+      }
+      var model = new Uint8Array(total), o = 0; parts.forEach(function (p) { model.set(p, o); o += p.length; });
+      ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.max(1, Math.min(4, navigator.hardwareConcurrency || 2)) : 1;
+      ort.env.wasm.wasmPaths = await wasmPaths(ort.env.wasm.numThreads > 1);
+      status("Starting the voice…");
+      var t1 = performance.now();
+      sess = await ort.InferenceSession.create(model, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+      window.KOL_LOAD = { download_ms: Math.round(t1 - t0), start_ms: Math.round(performance.now() - t1), mb: +(total / 1048576).toFixed(1), threads: ort.env.wasm.numThreads };
+      status("Ready. Runs on this device" + (navigator.onLine === false ? " (offline)" : "") + ".", "ok");
+      return sess;
+    })();
+    loading.catch(function (e) { loading = null; status("Could not load the voice: " + e.message, "err"); });
+    return loading;
+  }
+  function trimLevel(w) {
+    var pk = 0, i; for (i = 0; i < w.length; i++) pk = Math.max(pk, Math.abs(w[i]));
+    var thr = pk * 0.0126, a = 0, b = w.length - 1, keep = Math.round(0.03 * SR);           // ~ -38 dB of the peak
+    while (a < w.length && Math.abs(w[a]) < thr) a++; while (b > a && Math.abs(w[b]) < thr) b--;
+    a = Math.max(0, a - keep); b = Math.min(w.length, b + keep);
+    if (b - a > 0.2 * SR) w = w.subarray(a, b);
+    var t2 = 0.02 * pk, s = 0, n = 0; for (i = 0; i < w.length; i++) if (Math.abs(w[i]) > t2) { s += w[i] * w[i]; n++; }
+    var rms = Math.sqrt(s / Math.max(1, n)) + 1e-9, g = Math.min(4, Math.pow(10, -20 / 20) / rms), out = new Float32Array(w.length), p2 = 0;
+    for (i = 0; i < w.length; i++) { out[i] = w[i] * g; p2 = Math.max(p2, Math.abs(out[i])); }
+    if (p2 > 0.97) for (i = 0; i < out.length; i++) out[i] *= 0.97 / p2;
+    return out;
+  }
+  function joinPieces(ps) {
+    var pause = Math.round(0.25 * SR), fade = Math.round(0.04 * SR), n = 0, i, k;
+    ps.forEach(function (p) { n += p.length; }); n += pause * Math.max(0, ps.length - 1);
+    var out = new Float32Array(n), o = 0;
+    for (k = 0; k < ps.length; k++) {
+      var w = ps[k];
+      if (w.length > 2 * fade) {
+        if (k > 0) for (i = 0; i < fade; i++) w[i] *= i / fade;
+        if (k < ps.length - 1) for (i = 0; i < fade; i++) w[w.length - 1 - i] *= i / fade;
+      }
+      out.set(w, o); o += w.length + (k < ps.length - 1 ? pause : 0);
+    }
+    return out;
+  }
+  function wav(f) {
+    var b = new ArrayBuffer(44 + f.length * 2), v = new DataView(b), i;
+    function s(o, t) { for (i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); }
+    s(0, "RIFF"); v.setUint32(4, 36 + f.length * 2, true); s(8, "WAVE"); s(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+    v.setUint16(22, 1, true); v.setUint32(24, SR, true); v.setUint32(28, SR * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    s(36, "data"); v.setUint32(40, f.length * 2, true);
+    for (i = 0; i < f.length; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, f[i])) * 32767, true);
+    return new Blob([b], { type: "audio/wav" });
+  }
+  var STRETCH = { normal: [1.0, 0.9], slow: [0.85, 0.78] };                 // = the box (listener.py STRETCH)
+  var actx = null;
+  function player() {
+    if (!actx) { var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; actx = new AC(); }
+    if (actx.state === "suspended") actx.resume();
+    return { at: 0, first: null, push: function (w, t0) {
+      var b = actx.createBuffer(1, w.length, SR); (b.copyToChannel ? b.copyToChannel(w, 0) : b.getChannelData(0).set(w));
+      var s = actx.createBufferSource(); s.buffer = b; s.connect(actx.destination);
+      var start = Math.max(actx.currentTime + 0.05, this.at); s.start(start); this.at = start + w.length / SR + 0.25;
+      if (this.first === null) this.first = Math.round(performance.now() - t0);
+    } };
+  }
+  async function speak(text, speed, live) {
+    await load();
+    var pl = live ? player() : null;
+    var t0 = performance.now(), ps = KolText.pieces(text), t1 = performance.now(), outs = [];
+    for (var i = 0; i < ps.length; i++) {
+      var x = ids(ps[i].tts, cfg.phoneme_id_map); if (x.length < 5) continue;
+      var f = STRETCH[speed || "normal"][ps[i].lk >= 0.5 ? 1 : 0], inf = cfg.inference;
+      var feeds = { input: new ort.Tensor("int64", BigInt64Array.from(x.map(BigInt)), [1, x.length]),
+        input_lengths: new ort.Tensor("int64", BigInt64Array.from([BigInt(x.length)]), [1]),
+        scales: new ort.Tensor("float32", Float32Array.from([inf.noise_scale, inf.length_scale / f, inf.noise_w]), [3]) };
+      var r = await sess.run(feeds), w = trimLevel(r.output.data); outs.push(w); if (pl) pl.push(w.slice(0), t0);
+    }
+    var t2 = performance.now(), audio = joinPieces(outs), sec = audio.length / SR;
+    return { blob: wav(audio), text_ms: Math.round(t1 - t0), voice_ms: Math.round(t2 - t1), audio_s: sec, pieces: ps, first_ms: pl ? pl.first : null, played: !!pl };
+  }
+  window.KolPocket = { load: load, speak: speak, setSource: function (s) { SOURCE = s; }, ids: ids };
+  function fmt(r) {
+    var x = r.audio_s / Math.max(0.001, r.voice_ms / 1000);
+    return "Made " + r.audio_s.toFixed(1) + " s of speech in " + (r.voice_ms / 1000).toFixed(2) + " s on this device (" + x.toFixed(1) +
+      "× faster than real time" + (r.first_ms ? "; first words after " + (r.first_ms / 1000).toFixed(2) + " s" : "") + "). " +
+      (window.KOL_LOAD ? "Threads: " + window.KOL_LOAD.threads + "." : "");
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    if (!$("pk-go")) return;
+    var run = async function (speed) {
+      var t = $("pk-text").value.trim(); if (!t) return;
+      $("pk-go").disabled = $("pk-slow").disabled = true; status("Reading…");
+      try {
+        var r = await speak(t, speed, true), a = $("pk-audio"); a.src = URL.createObjectURL(r.blob); a.hidden = false;
+        if (!r.played) a.play().catch(function () {});
+        $("pk-time").textContent = fmt(r); status("Ready. Runs on this device.", "ok");
+        window.KOL_LAST = { text_ms: r.text_ms, voice_ms: r.voice_ms, audio_s: +r.audio_s.toFixed(2), pieces: r.pieces.length, first_ms: r.first_ms, threads: (window.KOL_LOAD || {}).threads };
+      } catch (e) { status("Something went wrong: " + e.message, "err"); }
+      $("pk-go").disabled = $("pk-slow").disabled = false;
+    };
+    $("pk-go").onclick = function () { run("normal"); }; $("pk-slow").onclick = function () { run("slow"); };
+    $("pk-load").onclick = function () { load(); };
+    caches && caches.open && caches.open(CACHE).then(function (c) { return c.keys(); }).then(function (k) { if (k && k.length > 2) load(); }).catch(function () {});
+    // the service worker keeps the page working offline and adds the two headers that let the voice use several CPU cores
+    if ("serviceWorker" in navigator && window.isSecureContext) {
+      navigator.serviceWorker.register(BASE + "sw.js", { scope: BASE }).then(function () {
+        if (!self.crossOriginIsolated && navigator.serviceWorker.controller && !sessionStorage.getItem("kolCoi")) { sessionStorage.setItem("kolCoi", "1"); location.reload(); }
+      }).catch(function () {});
+      navigator.serviceWorker.addEventListener("controllerchange", function () {
+        if (!self.crossOriginIsolated && !sessionStorage.getItem("kolCoi")) { sessionStorage.setItem("kolCoi", "1"); location.reload(); }
+      });
+    }
+  });
+})();
+
+;if(typeof KolTokens==='undefined'&&self.KolTokens){var KolTokens=self.KolTokens;}
+var KOL_TEXT_DATA = {"version":"kaggle-2.9 (2026-11-01, abbreviations + references (abbrev.py), לשון קודש detection + speed marks (lk.py; vowel path off by default after the A/B), accent.pre_tts; round-2 code as 2.6e; lexicon same as 2.5) + kaggle-2.11 abbreviation rows (רמ\"א רע\"ב שו\"ת בס\"ד זי\"ע, Jacob confirmed Nov 1) + kaggle-2.12 abbreviation rows (מהרש\"א ראב\"ע ריב\"ש ב\"ב הנ\"ל צ\"ל ר\"ה, Jacob confirmed Nov 1 4:05 PM; ר\"ה context rule in pocket-text.js rh_reading) + kaggle-2.14 (ראש השנה = rosh hashone רוֹש האשונע, Jacob confirmed Nov 1 4:17 PM; phrase pass matches inside ()[] and in LK clauses)","lex":{"לא":"לא","אמר":"אומער","ליה":"לייע","אלא":"עלא","רבי":"רעבי","על":"אל","רב":"ראוו","ולא":"וועלוי","הוא":"הי","נמי":"נאמי","אבל":"אוואל","משום":"מישעם","כל":"קאל","לו":"לוי","דלא":"דלא","את":"עס","לה":"לא","של":"שעל","דאמר":"דאמער","מאי":"מאי","הא":"הא","אי":"אי","אם":"אים","אומר":"אוימער","שלא":"שעלוי","זה":"זע","יהודה":"יעהידע","או":"אוי","כי":"קי","בר":"באר","עד":"אייד","מה":"מא","מן":"מין","בן":"בען","היא":"הי","הכי":"האכי","כיון":"קייווען","משמע":"מאשמע","לאו":"לאו","והא":"וועהא","הכא":"האכא","אחד":"עכעד","היה":"האיא","בין":"ביין","לומר":"לוימער","אפילו":"אפילע","התם":"האסאם","שאין":"שעיין","בו":"בוי","הוה":"הוו","אף":"אף","גבי":"גאבי","יוחנן":"יויכענען","אינו":"איינע","לי":"לי","יש":"יעש","הוי":"הוויי","להו":"לעהי","כו":"קי","ואין":"וועיין","בה":"בא","שמעון":"שימען","קאמר":"קאומער","אחר":"אכער","טעמא":"טאמע","וי\"ל":"וועיעש לוימער","פי":"פי","מי":"מי","ואם":"וועים","דכתיב":"דיכסיוו","וכן":"וועכיין","כן":"קיין","רבנן":"ראבונען","רבא":"רוֹווע","היינו":"הייני","אדם":"אדעם","יוסי":"יאסי","דהא":"דהא","בית":"בייס","איכא":"איכע","לך":"לאך","אחת":"אכעס","קרא":"קרא","קא":"קא","דבר":"דאבאר","שני":"שניי","למימר":"לעמיימער","ועוד":"וועויד","דאין":"דיין","חייב":"כאייעוו","עליו":"אולויוו","לן":"לאן","ישראל":"יסראעל","דאי":"די","וא\"ת":"וועאים טוימער","דרבי":"דרעבי","דרב":"דראוו","צריך":"צוריך","שהוא":"שעהי","כמו":"קעמוי","האי":"האי","הרי":"האריי","אסור":"אסער","סבר":"סאווער","ואי":"וועי","דמי":"דאמיי","זו":"זוי","יכול":"יוכעל","ורבי":"ווערעבי","ואמר":"וועומער","כגון":"קעגון","בפרק":"בעפיירעק","לפי":"לעפי","כתיב":"קסיוו","כאן":"קאן","בעי":"בעי","שנאמר":"שעניימער","עליה":"אלייהע","כך":"קאך","שמע":"שמא","שמואל":"שמיעל","ביה":"ביי","אמאי":"אמאי","היו":"הויע","אלעזר":"עלעזער","תנא":"טאנע","אליעזר":"עליעזער","מאיר":"מייער","כרבי":"קערעבי","מקום":"מוקעם","לרבי":"לערעבי","היכי":"היכי","אע\"ג":"אף על גאוו","אביי":"אבייע","מתני":"מאסני","בכל":"בעכאל","אותו":"אויסע","מפני":"מיפני","נראה":"נירע","אימא":"איימע","וכי":"וועכי","שיש":"שעיעיש","דקאמר":"דקאומער","בני":"בניי","מינה":"מינע","מותר":"מיטער","הונא":"הינע","אפי":"אפי","כדי":"קעדיי","בלא":"בעלוי","דברי":"דיוועריי","לעיל":"לעיל","ויש":"וועיעיש","כוכבים":"קויכאווים","להם":"לאהעם","למה":"לעמא","קשיא":"קאשע","בהן":"באהען","נחמן":"נאכמען","דתניא":"דטאניע","רבה":"ראבע","דין":"דין","לאחר":"לעאכער","אמרו":"אומרע","אומרים":"אוימרים","פטור":"פאטער","שאינו":"שעיינע","יהושע":"יעהאשע","אמרינן":"אמרינען","פריך":"פריך","דאיכא":"דיכע","שמא":"שעמע","לעולם":"לעוילעם","שנים":"שנאיים","ביום":"בעיוים","קתני":"קאסוני","קודם":"קוידעם","לרב":"לעראוו","הן":"היין","בעל":"באל","יוסף":"יאסעף","תימה":"טיימע","מצי":"מוצי","עקיבא":"עקיווע","אלו":"איילע","כלל":"קלאל","חטאת":"כאטעס","שפיר":"שאפיר","היכא":"היכע","שבת":"שאבעס","ודאי":"וואדאי","בא":"בא","וכו":"וועכי","שכן":"שעקיין","דוקא":"דאווקע","מהו":"מאהי","מעשה":"מייסע","קשה":"קאשע","מר":"מאר","שתי":"שטיי","אשי":"אשי","טומאה":"טימע","תורה":"טוירע","לענין":"לעיניען","יצחק":"יצכאק","לקמן":"לעקאמען","אל":"על","דלמא":"דילמע","פליגי":"פליגי","דתנן":"דיטאנאן","שהיה":"שעהאיא","אשה":"אישע","בהמה":"בעהיימע","טמא":"טומע","דהכא":"דהאכא","חד":"כאד","שאני":"שוני","רחמנא":"ראכאמונע","דקתני":"דקאסוני","הלכה":"האלאכע","מיניה":"מיני","חוץ":"כיץ","תלמוד":"טאלמעד","עצמו":"אצמע","תנו":"טונע","לפני":"ליפניי","פירש":"פיירעש","תניא":"טאניע","ואפילו":"וועאפילע","אינה":"איינע","הכל":"האקויל","דהתם":"דהאסאם","אני":"אני","כהן":"קויהן","דאמרי":"דומרי","הני":"האני","כדאמר":"קידומער","אתה":"אטע","ומיהו":"אומיהע","אית":"איס","דם":"דאם","חשיב":"כושעוו","עם":"אים","וכל":"וועכאל","אמרי":"אומרי","בשבת":"בעשאבעס","קאי":"קוי","פפא":"פאפע","מידי":"מידי","אלמא":"אלמע","איש":"איש","במקום":"בימעקוים","בקונטרס":"בעקינטרעס","גדול":"גודעל","גמ":"געמא","אבא":"אבע","ישמעאל":"ישמאעל","הבית":"האבאייס","דרבנן":"דעראבונען","הואיל":"הוייל","קמא":"קאמע","טפי":"טעפיי","ההוא":"האהי","דברים":"דווארים","מת":"מייס","השתא":"האשעטא","ראשון":"רישען","אתי":"אוסי","שלשה":"שלוישע","שרי":"שריי","מיירי":"מאירי","תנן":"טאנאן","א\"כ":"אים קען","ומה":"אומא","לפרש":"לעפורעש","יותר":"יויסער","אמרת":"אומרעט","פשיטא":"פשיטע","מצוה":"מיצווע","היתה":"הויסע","עשה":"אוסע","עולה":"אוילע","ואחד":"וועעכעד","אתא":"אסא","חסדא":"כיסדע","דהוי":"דהוויי","דהוה":"דאהוו","כלי":"קעלי","בעלמא":"בעאלמע","מאן":"מאן","שייך":"שייעך","לקיש":"לוקיש","איסור":"איסער","יין":"יאיין","בשר":"באסאר","איירי":"אירי","ליכא":"ליכע","בת":"באס","למאן":"לעמאן","ועל":"וועאל","פרק":"פיירעק","שנא":"שענא","מעשר":"מאעסער","ונראה":"ווענירע","חייא":"כייע","אפשר":"עפשער","פירוש":"פיירעש","הוו":"האוואוי","נזיר":"נוזיר","והוא":"וועהי","וגו":"וועגוי","ספק":"סאפעק","כתב":"קעסאוו","דאורייתא":"דאורייסע","לכל":"לעכאל","תימא":"טיימע","תרומה":"טרימע","גב":"גאוו","נקט":"נוקעט","אע\"פ":"אף על פי","אוכל":"אויכעל","ואינו":"וועיינע","וקשה":"וועקאשע","דרך":"דערעך","חכמים":"כאכומים","מילתא":"מילסע","בשלמא":"בישלאמע","גמליאל":"גאמליעל","פסול":"פאסל","איצטריך":"איצטריך","מ\"מ":"מיקאל מאקוים","מילי":"מילי","גט":"גט","בריה":"בריי","מים":"מאיים","ידי":"יעדיי","יצא":"יוצע","ומשני":"אומעשאני","כלומר":"קלוימער","תא":"טא","תרי":"טריי","זמן":"זעמאן","והשתא":"וועהאשעטא","חנינא":"כאנינע","דאית":"דאיס","חדא":"כאדא","ורב":"וועראוו","עשרה":"אסורע","אמינא":"אמיינע","עדים":"איידים","ומאי":"אומאי","ניחא":"ניכע","שלש":"שולעש","היום":"האיוים","לשון":"לושען","והכא":"וועהאכא","דאם":"דים","כלום":"קלים","דהיינו":"דהיינו","מכאן":"מיקען","ואע\"ג":"וועאף על גאוו","בפני":"ביפניי","מודה":"מוידע","כשר":"קאשער","לית":"ליס","שהרי":"שעהאריי","חבירו":"כאוויירע","וזה":"וועזע","ואת":"וועעס","שאם":"שעים","שהיא":"שעהי","יהא":"יעהיי","בבית":"בעווייס","מהן":"מייהען","תני":"טוני","להן":"לאהען","עושה":"אויסע","מכל":"מיקעל","לעשות":"לאעסעס","בפ\"ק":"בעפיירעק קאמא","קרבן":"קארבן","כמה":"קאמא","קדשים":"קאדושים","מפרש":"מעפורעש","נפקא":"נופקע","סיפא":"סייפע","ארבע":"ארבע","אותה":"אויסע","שוה":"שאווע","דאפילו":"דאאפילע","מנין":"מינאיין","ממנו":"מימענע","כדאמרינן":"קידאמרינען","תאמר":"טוימער","שנה":"שונע","עשר":"אוסער","טהור":"טוהער","נתן":"נוסען","יעקב":"יאקעוו","בשעת":"בישעאס","לימא":"ליימע","פירות":"פיירעס","עלה":"אלא","דמשמע":"דמאשמע","דר":"דאר","לר\"י":"לעריי","הבא":"האבא","הכתוב":"האקוסעוו","נינהו":"נינהע","בסוף":"בעסויף","ימים":"יומים","מטמא":"מעטאמי","ההיא":"האהי","שמאי":"שאמאי","אביו":"אוויוו","ברבי":"בערעבי","דליכא":"דליכע","דכל":"דכאל","אמות":"אמעס","בתר":"בוסער","בעינן":"באיינען","הקדש":"העקעדייש","במאי":"בעמאי","ראיה":"ראיע","למעוטי":"לעמאויטי","ברוך":"בורעך","מנא":"מנא","עלמא":"אלמע","בסמוך":"בעסומעך","דכיון":"דכייווען","כיצד":"קייצעד","דעתך":"דאטעך","בהו":"בעהי","נותן":"נויסען","דילמא":"דילמע","ורבנן":"וועראבונען","ארבעה":"ארבוע","מזבח":"מיזבייעך","סלקא":"סולקע","שלו":"שעלוי","הלל":"הילעל","במה":"באמע","עבד":"עבעד","בהדיא":"בעהעדיע","לרבנן":"לעראבונען","מייתי":"מאיסי","אמרה":"אומרע","ר\"ת":"ראבייני טאם","למעלה":"לעמאלע","עבודה":"אוואוידע","רבן":"ראבען","להיות":"ליהיעס","הדין":"האדין","דקא":"דקא","מיתה":"מיסע","שבועה":"שוויע","דריש":"דארייש","שלשים":"שלוישים","דבי":"דוויי","בתוך":"בעסויך","בתרא":"באסרע","טעם":"טאעם","שהיו":"שעהויע","מצות":"מיצוועס","מכלל":"מיקלעל","ר\"י":"ריי","לשם":"לעשיים","רישא":"ריישע","קנה":"קונע","דלאו":"דלאו","ואומר":"וועוימער","אילימא":"איליימע","שיהא":"שעיעהיי","משלם":"מעשאלעם","אצל":"אייצעל","יודע":"יוידייע","אחרים":"אכיירים","דאמרינן":"דאמרינען","רבינו":"ראביינע","דבעי":"דבעי","מדרבנן":"מידעראבונען","לבית":"לעווייס","הארץ":"האורעץ","והכי":"וועהאכי","אשתו":"אישטע","דרבא":"דרוֹווע","שחיטה":"שכיטע","מתניתין":"מאסניסין","מיד":"מיעד","לרבות":"לעראבעס","כר":"קאר","קטן":"קוטען","דכי":"דכי","בריש":"בערייש","רשות":"רעשיס","לכך":"לעכאך","והיינו":"וועהייני","אליבא":"אליבע","והתניא":"וועהאסאניע","שור":"שויר","בי":"ביי","תנאי":"טאנאיים","כסף":"קעסעף","עלי":"אולאי","נאמר":"נעעמער","בדבר":"בעדאבאר","חלב":"כיילעוו","כנגד":"קענעגעד","בזמן":"ביזעמאן","וחד":"וועכאד","וחכמים":"וואכאכומים","עביד":"אוועד","הויא":"האוויע","דלית":"דליס","התורה":"האטוירע","וכתיב":"אוקסיוו","כולה":"קילע","מחמת":"מייכעמעס","בנו":"בנוי","פסח":"פייסעך","ריש":"רייש","עמו":"אימע","קרי":"קורי","כמאן":"קעמאן","לוי":"לייוויי","אמה":"אמע","מעות":"מועס","כוותיה":"קוואויסי","ושמואל":"אושמיעל","למ\"ד":"לעמאן דאמער","מעיקרא":"מיעיקורע","עסקינן":"אסקינען","העולם":"האאוילעם","ולכך":"אולעכאך","יד":"יאד","שאינה":"שעיינע","האשה":"האאישע","מום":"מים","כדמוכח":"קעדמויכעך","ואמאי":"וועאמאי","שתים":"שטאיים","שעה":"שוע","ששת":"שיישעס","קסבר":"קאסאווער","ע\"י":"על יעדי","דמים":"דאמים","יהיה":"ייהיע","ואחר":"וועאכער","למטה":"לעמאטע","משה":"מוישע","זירא":"זיירע","שאר":"שעאר","ופריך":"אופריך","הם":"היים","בכלל":"ביכלאל","מביא":"מייווי","חצי":"כאצי","מתוך":"מיטעך","תחת":"טאכעס","והלא":"וואהאלוי","משני":"מעשאני","בזה":"באזע","הזה":"האזע","שהן":"שעהיין","ברשות":"בירעשיס","הדר":"האדאר","חיישינן":"כאישינען","והאי":"וועהאי","ממש":"מאמעש","דומיא":"דימיע","בידו":"בעיודע","איתמר":"איטמער","כאילו":"קעילע","אחא":"אכע","חולין":"כילין","כהנים":"קוהאנים","מנה":"מונע","גדולה":"געדוילע","עיקר":"איקער","שכר":"סוכער","ראשונה":"רישוינע","בכור":"בעכויר","לזה":"לאזע","נשים":"נושים","כבר":"קעבאר","שלמים":"שעלאמים","ביד":"בעיאד","דפריך":"דפריך","כולן":"קילען","קרקע":"קארקע","יוצא":"יויצי","אותן":"אויסען","למאי":"לעמאי","הרבים":"האראבים","עליהן":"אלייהען","ידו":"יודע","אסי":"אסי","גם":"גאם","שמן":"שעמען","סתם":"סטאם","דלעיל":"דלעיל","זרה":"זורע","פסולה":"פעסילע","בינייהו":"ביינאיהע","דהכי":"דהאכי","גברא":"גאוורע","אתיא":"אוסיע","מלאכה":"מלוכע","הקדוש":"האקודעש","חייבין":"כאיויווין","ובית":"אוווייס","ועד":"וועייד","שום":"שים","ואחת":"וועאכעס","י\"ל":"יעש לוימער","פחות":"פוכעס","לכהן":"לעקויהן","לאכול":"לעעכויל","משמיה":"מישמי","טמאה":"טעמייע","מיהו":"מיהע","דא\"כ":"דאים קען","ותימה":"וועטיימע","חדש":"כוידעש","וכיון":"וועכייווען","בחוץ":"באכיץ","אטו":"אטו","בכלי":"ביקעלי","סוף":"סויף","אחרת":"אכערעס","אמו":"אימע","תרתי":"טארטי","וחומר":"וואכוימער","ואפי":"וועאפי","להביא":"לעהאווי","וגם":"וועגאם","צריכה":"צריכע","בהא":"בעהא","כלים":"קיילים","בהם":"באהעם","אשם":"אושעם","שניהם":"שנייהעם","מצינו":"מאצינע","והיה":"וועהאיא","אב":"אוו","והאמר":"וועהאומער","ענין":"איניען","שדה":"סודע","כרת":"קורעס","ואף":"וועאף","עושין":"אויסין","חזקה":"כאזאקע","ולהכי":"אולעהאכי","ובין":"אווויין","ירמיה":"יירמיע","רוב":"רויוו","לגבי":"לעגאבי","סבירא":"סווירע","מיבעי":"מיבי","נימא":"ניימע","הלכתא":"הילכסע","בירושלמי":"בירושאלמי","מקדש":"מיקדעש","בגמרא":"ביגעמורע","הראשון":"הארישען","קני":"קוני","שאמר":"שעומער","צריכא":"צריכע","כשרה":"קעשיירע","הנאה":"האנוע","אנא":"אנא","בשביל":"בישוויל","עצמה":"אצמע","כהנא":"קוהענע","מהני":"מאהעני","קמיה":"קאמי","גופיה":"גיפי","לפניו":"לעפונויוו","כולו":"קילע","ראוי":"רוי","אסורה":"אסירע","מתנה":"מאטונע","טומאת":"טימעס","יפה":"יופע","רבינא":"ראווינע","גמר":"גומער","לנו":"לונע","מיבעיא":"מיבייע","אשת":"איישעס","עובד":"אויוועד","נזירות":"נעזירעס","מהכא":"מייהוכע","זכר":"זוכער","כתובה":"קעסיבע","הלכך":"הילקעך","ושמא":"וועשעמע","בלילה":"באלאילע","אכילה":"אכילע","תעשה":"סאעסע","כזית":"קעזאייס","מנלן":"מינאלאן","שבעה":"שיווע","לגמרי":"ליגעמורי","היתר":"העטער","וא\"כ":"וועאים קען","קדשי":"קודשי","הדם":"האדאם","הקונטרס":"האקינטרעס","ברישא":"בעריישע","רש\"י":"ראשי","הך":"האך","ברייתא":"בראיסע","וקאמר":"וועקאומער","ממון":"מאמען","חוזר":"כויזער","הרבה":"האראבע","דיש":"דיעיש","בשני":"בישניי","שנו":"שונע","דמיירי":"דמאירי","בשאר":"בישעאר","בהדי":"באהעדי","עליהם":"אלייהעם","והדר":"וואהאדאר","ומי":"אומי","מאה":"מייע","עולם":"אוילעם","לישנא":"לישונע","שיעור":"שיער","קדש":"קוידעש","א\"נ":"אי נאמי","קטנה":"קעטאנע","עובר":"אויווער","ואיכא":"וועיכע","דאינו":"דיינע","דאפי":"דופי","אכל":"אוכעל","ראש":"רויש","דשמואל":"דישמיעל","דמה":"דאמא","גזירה":"געזיירע","משכחת":"מאשקאכעט","המזבח":"האמיזבייעך","איתא":"איסע","ברכה":"בראכע","מועד":"מויעד","אחרינא":"אכארינע","לאפוקי":"לעאפויקי","עוד":"אויד","בתרומה":"ביסרימע","שטר":"שטאר","מני":"מאני","הבעל":"האבאל","פליג":"פליג","לדבר":"לעדאבאר","פלוני":"פלויני","האומר":"האוימער","לתוך":"לעסויך","נעשה":"נאעסע","דינא":"דינע","מקרא":"מיקרע","פעמים":"פעומים","לידי":"ליידיי","פרה":"פורע","כולי":"קילי","נאמן":"נעעמאן","וליכא":"וועליכע","ילפינן":"יאלפינען","אתו":"אסוי","מנת":"מנאס","לרבא":"לערוֹווע","דפליגי":"דיפליגי","חזי":"כאזיי","לקמיה":"לעקאמי","אמי":"אמי","רוצה":"רויצע","ידע":"יודע","כרבנן":"קעראבונען","לחלק":"לעכאלעק","ומר":"אומאר","מוקי":"מויקי","פתח":"פעסאך","סימן":"סימען","יומא":"יוימע","חמור":"כאמויר","כרב":"קעראוו","סברי":"סאוורי","מיתיבי":"מייסיווי","מלא":"מלוי","בעלה":"באלע","ובפרק":"אובעפיירעק","סברא":"סווארע","דמתני":"דמאסני","דקרא":"דיקרא","העוף":"האויף","להכי":"לעהאכי","פרט":"פראט","עומד":"אוימעד","והוי":"וועהוויי","דהאי":"דהאי","בתורה":"באטוירע","ואלו":"וועיילע","חמא":"כומע","לאתויי":"לעייסויעי","איני":"אייני","דשרי":"דשורי","חיים":"כאיים","ליתן":"לייטיין","דנקט":"דנוקעט","הכפורים":"האקיפירים","יאכל":"יויכעל","קל":"קאל","מחייב":"מעכאיעוו","השנה":"האשונע","נפש":"נעפעש","ואמרי":"וועומרי","מהם":"מייהעם","ובא":"אוווא","כולהו":"קילהע","תרוייהו":"טארוואיהע","נוטל":"נויטעל","לחזור":"לאכזער","חוב":"כויוו","עולא":"אילע","זוזי":"זיזי","בעלים":"בולים","דאסור":"דאסער","איסורא":"איסירע","שביעית":"שווייס","לוקה":"לויקע","מין":"מין","מעילה":"מילע","לחם":"לעכעם","חמשה":"כאמישע","חיה":"כאיע","דודאי":"דוואדאי","דתימא":"דסיימע","ומשום":"אומישעם","יחיד":"יוכיד","כשהוא":"קעשעהי","והרי":"וואהאריי","מדבר":"מעדאבער","חמש":"כומעש","לאשמועינן":"לעאשמויינען","כפרה":"קאפורע","דתנא":"דטאנע","אבהו":"אוואהע","משנה":"מישנע","זהב":"זוהעוו","הפסח":"האפייסעך","שמים":"שאמאיים","בעלי":"באאליי","טהורה":"טעהוירע","גוי":"גוי","מזה":"מיזע","ומפרש":"אומעפורעש","קיימא":"קוימע","להלן":"לעהאלען","לארץ":"לאורעץ","אוכלין":"אויכלין","דידיה":"דיידיי","דסבר":"דסאווער","בטל":"באטייל","מלך":"מעלעך","קנין":"קניען","קיים":"קאיוים","ב\"ד":"בייס דין","ראשו":"רוישע","למיפרך":"לעמיפרעך","בחזקת":"בעכעזקאס","ימי":"יעמיי","ורבא":"ווערוֹווע","עבודת":"אוואוידעס","מינייהו":"מינאיהע","לישראל":"לעיסראעל","גרסינן":"גארסינען","שבא":"שעבא","כעין":"קעיין","מרובה":"מריבע","עשרים":"עסרים","זריקה":"זריקע","אותם":"אויסעם","אנו":"אונע","גוונא":"גאוונע","אסורין":"אסירין","כדתנן":"קעדיטאנאן","ותו":"וועסי","בנים":"בונים","השבת":"האשאבעס","מיחייב":"מיכאיאיוו","שניה":"שניע","שפירש":"שעפיירעש","ולפי":"אולעפי","ביאה":"ביע","בארץ":"באורעץ","העיר":"האיר","לשנויי":"לעשאנויעי","שליח":"שאליעך","דכולי":"דכילי","סמוך":"סומעך","תוך":"טויך","מחלוקת":"מאכלויקעס","בלבד":"בילעוואד","למחר":"לעמוכער","תהא":"טעהיי","אידי":"אידי","דתני":"דסוני","מתקיף":"מאסקעף","קדוש":"קודעש","מעל":"מועל","ושל":"וועשעל","הגוף":"האגיף","וקא":"וועקא","דהשתא":"דהאשעטא","ואל":"וועאל","ומת":"אומייס","והתם":"וועהאסאם","ואימא":"וועיימע","קמיפלגי":"קאמיפאלגי","דמו":"דומע","לחבירו":"לאכאוויירע","מנחה":"מינכע","אנן":"אנאן","גובה":"גויווע","מדלא":"מידלע","במסכת":"בעמאסעכעס","בשטר":"בישטאר","מברך":"מעווארעך","דאתא":"דאאסא","נדר":"נעדער","רבו":"ראבע","להוציא":"לעהויצי","מקודשת":"מעקידעשעס","אהל":"אויהעל","מלמד":"מלאמעד","סגי":"סאגי","מוכח":"מויכעך","ר\"ש":"רעבי שימען","איפכא":"איפכע","תפילין":"טפילין","דוד":"דוד","אחיו":"אוכיוו","עץ":"אייץ","בלשון":"בילעשוין","מיהא":"מיהע","אשכחן":"אשקכען","נדה":"נידע","טרפה":"טרייפע","איבעיא":"איבייע","גזרו":"געזארע","ממזר":"מאמזער","תם":"טאם","מדאורייתא":"מידאורייסע","לבא":"לאוואוי","דבעינן":"דוואיינען","עבדי":"אוודי","הריני":"הארייני","טפח":"טעפעך","לכם":"לוכעם","ה\"נ":"האכי נאמי","ר\"מ":"רעבי מייער","בעיא":"בועיע","קמ\"ל":"קא מאשמא לאן","לכתחלה":"לעכאטכילע","מהא":"מייהע","לצורך":"לעצוירעך","וצריך":"וועצוריך","והיא":"וועהי","סתמא":"סטאמע","הגלילי":"האגלילי","כלאים":"קילאיים","יעשה":"יאעסע","דאיירי":"דירי","בבת":"בעוואס","בפנים":"ביפנים","חנה":"כונע","רמי":"רומי","בימי":"ביימיי","אדא":"אדע","מועלין":"מויעלין","דדוקא":"דדאווקע","אינן":"איינען","קצת":"קאצטע","המת":"האמייס","ויאמר":"וואיוימער","מצורע":"מעצוירע","מדכתיב":"מידיכסיוו","אלמנה":"אלמאנע","משל":"מישעל","רצה":"רוצע","דמייתי":"דמאיסי","שיכול":"שעיוכעל","עצים":"אייצים","גמור":"גומער","מקצת":"מיקצעס","כתוב":"קוסעוו","טובא":"טיווע","שמה":"שעמא","הנך":"הונעך","לאביי":"לעאבייע","פרוטה":"פריטע","ולד":"וואלאד","רק":"ראק","בכך":"בעכאך","המים":"האמאיים","דעת":"דאאס","בגדים":"בעגודים","נמצא":"נימצע","עשו":"אוסע","ש\"מ":"שמא מינע","ע\"כ":"על קארכאך","אדרבה":"אדרעבע","חכם":"כוכעם","זאת":"זויס","מוכר":"מויכער","רביעית":"רעווייס","ואיבעית":"וועיבועס","מעתה":"מייאטע","ולבסוף":"אולעבאסויף","יליף":"יולעף","בידי":"בעיודי","ואילך":"וועיילעך","בהנאה":"באהאנוע","ביתו":"בייסע","חמץ":"כומעץ","נדרים":"נעדורים","צריכין":"צריכין","דגבי":"דגאבי","תיפוק":"טיפעק","מתה":"מייסע","חובה":"כויווע","דקאי":"דקוי","תלתא":"טלוסע","רבים":"ראבים","ארץ":"ערעץ","קונה":"קוינע","אגב":"אגעוו","שאול":"שועל","דומה":"דוימע","חלה":"כולע","פיגול":"פיגעל","מסתברא":"מיסטאברע","שומר":"שוימער","במים":"בעמאיים","המקדש":"האמיקדעש","למיתני":"לעמיסני","חי":"כאי","אביה":"אוויהע","לבן":"לאבען","יבא":"יאווע","שמעינן":"שאמינען","צבור":"ציבער","קידושין":"קידושין","ומן":"אומין","תנינא":"טניינע","נותנין":"נויסנין","לבעל":"לעבאל","דרשינן":"דארשינען","לאדם":"לעאדעם","לטעמיה":"לעטאמי","פני":"פניי","זרע":"זערע","איזהו":"אייזעהע","שתהא":"שעטעהיי","חצר":"כוצער","טעון":"טוען","ערב":"ערעוו","עדיף":"אדיף","דמאי":"דמאי","לכתוב":"ליכעטויוו","גופא":"גיפע","מותרת":"מיטערעס","הקשה":"האקאשע","שלם":"שולעם","כדאיתא":"קידיסע","דמיא":"דאמעיא","וחזר":"וועכוזער","קול":"קויל","איתיביה":"אייסיווי","דחשיב":"דכאשעוו","ואינה":"וועיינע","בחד":"בעכאד","מתיר":"מאטיר","מהאי":"מייהאי","אושעיא":"אוישייע","טפחים":"טעפוכים","בשל":"בעשעל","מערבין":"מורווין","מכר":"מוכער","דבריו":"דווארויוו","מלוה":"מאלווע","שמת":"שעמייס","באחד":"בעעכעד","שהם":"שעהיים","עצמן":"אצמען","אהרן":"אהערען","וכמה":"וועקאמא","מבית":"מיבעס","קדושת":"קעדישעס","גופה":"גיפע","נפשיה":"נאפשי","שלישי":"שלישי","ספרים":"ספורים","סוכה":"סוכע","בשעה":"בעשוע","מחיצה":"מעכיצע","ועשה":"וועוסע","ואידך":"וועידעך","קדושה":"קעדישע","היאך":"הייעך","אבר":"אייווער","הימנו":"היימענע","שהיתה":"שעהויסע","לפיכך":"לעפיכעך","נקבה":"נעקייווע","רע":"רא","באין":"באין","חליצה":"כאליצע","גר":"גייר","דאע\"ג":"דאף על גאוו","טהרה":"טאהארע","הים":"האיאם","אוסר":"אויסער","ינאי":"יאנאי","עור":"אויר","ידים":"יאדאיים","החמה":"האכאמע","שלום":"שולעם","מותרין":"מיטורין","נפל":"נופעל","דווקא":"דאווקע","ונתן":"ווענוסען","לשמה":"לישעמא","דאתי":"דוסי","דלקמן":"דילעקאמען","אינשי":"אינושי","קראי":"קרוי","ולאו":"וועלאו","הלחם":"האלעכעם","תלוי":"טולוי","חדשים":"כאדושים","חשוב":"כושעוו","איהו":"איהע","דייק":"דויעק","נהי":"נעהי","הבשר":"האבאסאר","המוכר":"האמויכער","דדריש":"דדארייש","היחיד":"האיוכיד","שיצא":"שעיוצע","עדות":"איידעס","ממנה":"מימענע","דהוו":"דאהאוואוי","בור":"בויר","חלק":"כיילעק","כדכתיב":"קעדיכסיוו","מעלה":"מאעלע","ספר":"סייפער","למילף":"לעמיילעף","חל":"כאל","אבוה":"אווי","בברייתא":"בעבראיסע","לדברי":"לעדיוועריי","הכהן":"האקויהן","ומאן":"אומאן","עירוב":"איירעוו","להא":"לעהא","אידך":"אידעך","והוה":"וואהוו","אכתי":"אקאטי","תמיד":"טומיד","יביא":"יאווי","דאף":"דאף","כדמשמע":"קעדמאשמע","תחלה":"טעכילע","מכדי":"מיקדי","טרפון":"טארפאן","זיל":"זיל","דמוקי":"דמויקי","שמו":"שמוי","מדקתני":"מידקאסוני","רובא":"ריבע","מצטרפין":"מיצטורפין","הדבר":"האדאבאר","דוחה":"דויכע","דעל":"דאל","כתובתה":"קעסיבוסע","לשמואל":"לישמיעל","יכולין":"יעכוילין","הש\"ס":"האשאס","אתם":"אטעם","שכבר":"שעקעבאר","חרס":"כערעס","הדיוט":"העדיעט","ימות":"יעמויס","ארבעים":"ארבוים","פר":"פאר","מתכוין":"מיסקאווען","ויום":"וועיוים","תיובתא":"טיובטע","לילה":"לאילע","ארעא":"ארע","דשמא":"דשעמע","עני":"אוני","והתנן":"וועהוסנען","כדאמרי":"קידומרי","מוציא":"מויצי","בפסח":"באפייסעך","אבין":"אווין","א\"ל":"אומער לייע","שער":"שאער","כהונה":"קעהינע","לאסור":"לעאסער","מדקאמר":"מידקאומער","דכתב":"דיכעסאוו","כותבין":"קויסווין","גרס":"גראס","פ\"ה":"פיירעש האקינטרעס","הגט":"האגט","לוקח":"לויקייעך","המלך":"האמעלעך","גבוה":"גאוואויהע","דנין":"דונין","דעתו":"דאטע","מחוסר":"מעכיסער","חסר":"כוסער","ס\"ד":"סאלקא דאטאך","מערב":"מייערעוו","מצא":"מוצע","עוף":"אויף","נכנס":"ניכנעס","נזק":"נעזעק","בתו":"ביטוי","ידיו":"יודויוו","פעם":"פאעם","מנחת":"מינכעס","מודים":"מוידים","יאמר":"יוימער","שאמרו":"שעומרע","רוח":"רוייעך","שינוי":"שינוי","ששה":"שישע","הולד":"האוואלאד","ותירץ":"וועטיירעץ","תורת":"טוירעס","פלוגתא":"פלוגטע","במזיד":"בעמייזיד","באכילה":"באאכילע","נפשות":"נעפושעס","חמרא":"כאמרע","למימרא":"לעמיימרע","וגבי":"וועגאבי","בקדשים":"בעקאדושים","ונמצא":"ווענימצע","מודו":"מוידע","דקסבר":"דקאסאווער","לעצמו":"לעאצמע","להאי":"לעהאי","נוהג":"נויהעג","מיני":"מיני","נחמיה":"נעכעמיע","ואלא":"וועעלא","כולם":"קילעם","שש":"שייש","שבע":"שעווע","בתוספתא":"בעסויסעפטע","תודה":"טוידע","מצה":"מאצע","ממקום":"מימוקעם","ובלבד":"אובילעוואד","ואילו":"וועילע","חטא":"כייט","ראה":"רוע","נכסים":"נעכוסים","קרן":"קערען","בחצר":"בעכוצער","ק\"ו":"קאל וואכוימער","א\"ר":"אומער רעבי","איניש":"איניש","פוטר":"פויטער","נערה":"נאערע","במינו":"בעמינע","קדושין":"קידישין","בדין":"באדין","השטר":"האשטאר","פסולין":"פעסילין","יהיב":"יוהעוו","הלך":"האלאך","היין":"האיאיין","כח":"קויעך","נבלה":"נעוויילע","גופו":"גיפע","עולת":"אוילעס","דאיצטריך":"דיצטריך","הבן":"האבען","הביא":"הייווי","הייתי":"האייסי","כשם":"קעשיים","אסר":"אוסער","שעל":"שעאל","יחזיר":"יאכזיר","לחודיה":"לעכוידי","יתיב":"יוסעוו","ידעינן":"יאדינען","פוסל":"פויסעל","טבילה":"טווילע","ר\"ח":"ראבייני כאנאנעל","ליום":"לעיוים","עיר":"איר","קרוב":"קורעוו","תמורה":"טעמירע","סאה":"סא","שיהו":"שעיעהי","העם":"האאם","אך":"אך","דההיא":"דהאהי","בשוגג":"בעשויגעג","וה\"ה":"וועהו הדין","מאות":"מייעס","כאחד":"קעעכעד","ודלמא":"וועדילמע","בנות":"בנויס","לצאת":"לאצייס","בכסף":"בעכעסעף","ואני":"וואאני","עובדי":"אויוודי","בפ\"ב":"בעפיירעק בייס","תהיה":"טיהיע","יתן":"ייטען","איריא":"איריע","עלך":"אלאך","האיש":"האיש","לבני":"ליוועניי","דימי":"דיימי","למיחש":"לעמייכעש","לבי":"לעוויי","פלגא":"פאלגע","בקר":"בויקער","דפליג":"דיפליג","קושיא":"קאשע","קורא":"קוירי","בשם":"בעשיים","וקתני":"וועקאסוני","מקומות":"מעקוימעס","רואה":"רויע","קנס":"קנאס","שרץ":"שערעץ","בשתי":"בישטיי","אלהים":"עלויהים","המוציא":"האמויצי","פ\"ק":"פיירעק קאמא","בעולם":"באוילעם","הולך":"הוילעך","מומין":"מימען","כריתות":"קריסעס","לכתחילה":"לעכאטכילע","לר\"ת":"לעראבייני טאם","והני":"וועהוני","מוסיף":"מויסיף","נח":"נויעך","אש":"אייש","עדיין":"אדאיין","עמה":"אימע","דרבה":"דראבע","בטלה":"באטלא","בעא":"בעא","כדמפרש":"קעדימעפורעש","לאשה":"לעישע","דמעיקרא":"דמיעיקורע","וההיא":"וועהאהי","פטורין":"פעטירין","קרב":"קורעוו","מקבל":"מעקאבעל","בנזיר":"בענוזיר","מאחר":"מייאכער","דהוא":"דהי","חייבי":"כאיויווי","השני":"האשייני","בההיא":"בעהאהי","להקשות":"לעהאקשעס","בראש":"בערויש","נסכים":"נעסוכים","פנים":"פונים","דמתניתין":"דמאסניסין","דפשיטא":"דיפשיטע","תאכל":"טויכעל","שלמה":"שעלוימע","בטומאה":"בעטימע","דמשום":"דמישעם","ואתי":"וועוסי","מביאין":"מוויין","משקין":"מאשקין","שעשה":"שעוסע","ירושלים":"יערישאלאיים","פסק":"פוסעק","והיו":"וועהויע","וטעמא":"וועטאמע","הדדי":"האדודי","יונתן":"יוינוסען","אחריתי":"אכאריסי","באמצע":"באעמצע","אחריו":"אכערויוו","מאמר":"מאעמער","רשע":"רושע","שאתה":"שעאטע","דמר":"דמאר","הכהנים":"האקוהאנים","לחוש":"לוכעש","שרת":"שורעס","בישראל":"בעיסראעל","בשדה":"באסודע","לאכילה":"לאאכילע","ממה":"מימע","קודש":"קוידעש","הללו":"האלולע","בבהמה":"ביבעהיימע","בפניו":"בעפונויוו","זית":"זאייס","מההיא":"מייהאהי","להתיר":"לעהאטיר","ושני":"אושניי","ידיה":"יאדייהע","שאינן":"שעיינען","אמורים":"אמירים","השם":"האשיים","פת":"פאס","שלח":"שעלאך","מזונות":"מעזוינעס","עלייהו":"אלאיהע","תצא":"טייצי","ואמרו":"וועומרע","ברירה":"בריירע","ותניא":"וועטאניע","מתיב":"מייסיוו","באו":"באי","עמד":"אומעד","בדרך":"באדערעך","ור\"ת":"וועראבייני טאם","עבדו":"אוודע","לשום":"לעשים","יאוש":"יעיעש","צד":"צאד","שצריך":"שעצוריך","כ\"ש":"קאל שקיין","ר\"א":"רעבי עליעזער","בבל":"באוועל","הבהמה":"האבעהיימע","לטמא":"לעטומע","בלאו":"בעלאו","הניחא":"האניכע","ולרבי":"אולערעבי","אמת":"עמעס","לאלתר":"לעאלטער","ר\"ע":"רעבי עקיווע","ס\"ל":"סוואווער לייע","והן":"וועהיין","זוטרא":"זיטרע","חבית":"כאוויס","דעלמא":"דאלמע","חזקיה":"כיזקיע","תלמיד":"טאלמיד","בנה":"בנא","נכרי":"נוכרי","שעת":"שעאס","במעשר":"בעמאעסער","באותו":"בעויסע","בתחלה":"באטעכילע","הפרה":"האפורע","אזלינן":"אזלינען","זהו":"זעהע","לאיש":"לעיש","באותה":"בעויסע","מאתים":"מאסאיים","ד\"ה":"דיבור האמאסכיל","לאחרים":"לאאכיירים","ראויה":"רעיע","המנונא":"האמנינע","הטומאה":"האטימע","כרחך":"קורכעך","עבר":"אווער","לקיים":"לעקאיעם","קלים":"קאלים","יצאו":"יוצע","קטנים":"קעטאנים","עכשיו":"אכשויוו","אשמעינן":"אשמינען","ידענא":"יאדאנע","חנם":"כינעם","ניכר":"ניקער","האדם":"האאדעם","מחצה":"מעכעצע","זכה":"זוכע","באה":"בוע","מכח":"מיקויעך","טבל":"טאוועל","פרי":"פרי","לחומרא":"לעכימרע","מסיק":"מאסעק","יהיו":"ייהיע","מוקמינן":"מויקמינען","יכולה":"יעכוילע","מטמאה":"מעטאמע","גוים":"גויים","פה":"פע","תקנה":"טאקונע","דשאני":"דשוני","השוחט":"האשויכעט","דאביי":"דאבייע","מחשבה":"מאכשאווע","נטמא":"ניטמע","דחולין":"דכילין","זבח":"זעוועך","מרבי":"מייראבי","עון":"אוען","דדרשינן":"דדארשינען","אילו":"אילע","בערב":"בעערעוו","טבול":"טוויל","חילוק":"כילעק","מטמאין":"מעטאמין","הדרן":"האדארען","שלה":"שעלא","לשמו":"לישמוי","ת\"ל":"טאלמיד לוימער","ה\"מ":"האני מילי","דרישא":"דריישע","למכור":"לימעקויר","נסך":"נעסעך","דטעמא":"דטאמע","ושלא":"וועשעלוי","דעתיה":"דאטי","מכשיר":"מאכשיר","מרי":"מורי","פשוט":"פושעט","ואידי":"וועידי","מיא":"מאיע","שמיה":"שמיי","דיני":"דיני","עליך":"אלייכע","תחתיו":"טאכטויוו","ממאי":"מימאי","רשאי":"ראשאי","אזל":"אזאל","והיכי":"וועהיכי","דחייב":"דכאייעוו","לאוקמי":"לעויקוימי","ב\"ש":"בייס שאמאי","כדרך":"קעדערעך","תיקו":"טייקו","ויהי":"וואיעהי","מבחוץ":"מיבאכעץ","כבוד":"קוואויד","נדבה":"נעדאווע","אברהם":"אווראהאם","כדקאמר":"קידקאומער","ביין":"בעיאיין","גנב":"גאנעוו","גמורה":"געמירע","אילן":"אילען","כדתניא":"קידסאניע","ומחצה":"אומעכעצע","ליתני":"ליסני","גזל":"גוזעל","חורין":"כוירין","מסייע":"מעסאיאי","בעין":"בעיין","מחיים":"מייכאיים","ולמה":"וועלאמא","הבאה":"האבוע","בדם":"באדאם","למקום":"לעמוקעם","כדקתני":"קידקאסוני","דמפרש":"דימעפורעש","סמיכה":"סמיכע","לחולין":"לעכילין","דאילו":"דילע","ישן":"יושען","ומשמע":"אומאשמע","בדק":"בעדעק","כתיבי":"קעסיווי","לשמן":"לישעמאן","הראשונים":"הארישוינים","אומרת":"אוימערעס","לאוין":"לאווין","חרש":"כיירעש","אהא":"אהע","בעדים":"בעיידים","סהדי":"סוהעדי","חזר":"כוזער","תדע":"טיידע","ואסור":"וועאסער","אמן":"אומען","לכן":"לאכיין","דבכל":"דיבעכאל","דההוא":"דהאהי","תיבעי":"טיבי","יבם":"יאוועם","למי":"לעמי","שליש":"שליש","ואתא":"וואאסא","הכשר":"העקאשער","ומייתי":"אומאיסי","אהבה":"אהעווע","האם":"האיים","רגלים":"ראגלאיים","הרגל":"הארעגעל","בעו":"בוי","לרשות":"לירעשיס","מברכין":"מעווארכין","בניו":"בונויוו","בל":"באל","ומותר":"אומיטער","חמורה":"כאמירע","תשעה":"טישע","בתים":"וואטים","קרבנות":"קארבאנעס","דינר":"דינער","מפי":"מיפי","אז":"אז","בחול":"באכויל","ברוב":"בערויוו","ודוקא":"וועדאווקע","מחיצות":"מעכיצעס","ומ\"מ":"אומיקאל מאקוים","במי":"בעמי","מיתות":"מיסעס","שמונה":"שעמוינע","חול":"כויל","מקח":"מעקאך","בעזרה":"באאזורע","כאשר":"קאאשער","שבועת":"שוויעס","אצטריך":"איצטריך","ספיקא":"ספייקע","אהדדי":"אהאדודי","שעיר":"סויר","ומסיק":"אומאסעק","דשבת":"דשאבעס","זר":"זאר","ממעט":"מעמאעט","בעיר":"באיר","שכתוב":"שעקוסעוו","תוס'":"טויספעס","גמ'":"געמורע","מתני'":"מאסניסין","ת\"ש":"טא שמא","א\"ה":"אי האכי","ת\"ר":"טאנו ראבונען","מ\"ד":"מאן דאמער","כ\"ע":"קילי אלמע","לכ\"ע":"לעקילי אלמע","ואע\"פ":"וועאף על פי","אפ\"ה":"אפילו האכי","ואפ\"ה":"וועאפילו האכי","כר\"ש":"קעראבי שימען","ש\"ס":"שאס","דגרסי'":"דגארסי","ב\"ה":"בייס הילל","ה\"א":"הוו אמינא","ע\"ז":"אוויידע זורע","במתני'":"בעמאסניסין","ק\"ש":"קריאס שמא","הקב\"ה":"האקאדויש בורעכו","ר'":"רעבי","וגו'":"וועגוי","כו'":"קוי","וכו'":"וועכוי","ז\"ל":"זאל","מהרש\"א":"מאהארשא","מהר\"ם":"מאהאראם","רמב\"ם":"ראמבאם","רמב\"ן":"ראמבאן","רשב\"א":"ראשבע","ריטב\"א":"ריטווע","ר\"ן":"ראן","רא\"ש":"ראש","שו\"ע":"שילכן ארוך","ת\"ק":"טאנע קאמע","תוספות":"טויספעס","גמרא":"געמורע","תירוץ":"טיירעץ","ממילא":"מימיילע","סוגיא":"סיגיע","פשט":"פשאט","לכאורה":"לעכאורע","שיטה":"שיטע","אמורא":"אמוירע","ירושלמי":"ירושאלמי","חומרא":"כימרע","קולא":"קילע","לקולא":"לעקילע","חזקת":"כעזקאס","סוכות":"סיקעס","כתובות":"קעסיבעס","גיטין":"גיטין","לבעלה":"לעבאלע","בתולה":"בעסולע","בתולים":"בעסילים","מזיק":"מאזיק","שליחות":"שליכעס","מחילה":"מעכילע","תשובה":"טשווע","תפילה":"טפילע","ברכות":"בראכעס","טענה":"טאנע","טענת":"טאנאס","מצאתי":"מאצוסי","לאוסרה":"לעאסרע","פסוק":"פאסיק","מציעא":"מעציע","מיגו":"מיגי","תערובת":"טאארויוועס","מעידין":"מעאידין","מחמיר":"מאכמיר","מקיל":"מייקל","פארקינג":"פאַרקינג","וקושיא":"וועקאשע","דקושיא":"דקאשע","לקושיא":"לעקאשע","הקושיא":"האקאשע","קושיות":"קאשעס","וקושיות":"וועקאשעס","דקושיות":"דקאשעס","לקושיות":"לעקאשעס","הקושיות":"האקאשעס","געליטן":"געליטען"},"phr":{"אמר רבא":"אומער רוֹווע","אמר אביי":"אומער אבייע","לא קשיא":"לא קאשיע","רבא אמר":"רוֹווע אומער","ליה אביי":"לייע אבייע","קשיא הא":"קאשיע הא","אמר ליה אביי":"אומער לייע אבייע","לא קשיא הא":"לא קאשיע הא","ולא קשיא":"ולא קאשיע","ולא קשיא הא":"ולא קאשיע הא","ראש השנה":"רוֹש האשונע","בראש השנה":"בערוֹש האשונע","וראש השנה":"ווערוֹש האשונע","דראש השנה":"דערוֹש האשונע","לראש השנה":"לערוֹש האשונע","הראש השנה":"הארוֹש האשונע","שראש השנה":"שערוֹש האשונע","כראש השנה":"קערוֹש האשונע","מראש השנה":"מערוֹש האשונע","ובראש השנה":"אובערוֹש האשונע","ולראש השנה":"וועלערוֹש האשונע","ודראש השנה":"וועדערוֹש האשונע","דהראש השנה":"דעהארוֹש האשונע","שבראש השנה":"שעבערוֹש האשונע","שלראש השנה":"שעלערוֹש האשונע","והראש השנה":"וועהארוֹש האשונע","מהראש השנה":"מעהארוֹש האשונע","שהראש השנה":"שעהארוֹש האשונע","להראש השנה":"לעהארוֹש האשונע","בהראש השנה":"בעהארוֹש האשונע"},"ab":{"אא\"כ":[["אלא","אם","כן"],"E"],"א\"א":[["אי","אפשר"],"E"],"אי\"ה":[["אם","ירצה","השם"],"E"],"או\"ח":[["אורח","חיים"],"E"],"אה\"ע":[["אבן","העזר"],"E"],"יו\"ד":[["יורה","דעה"],"E"],"חו\"מ":[["חושן","משפט"],"E"],"שו\"ת":[["!שיילעס","!אוטשוועס"],"P"],"בס\"ד":[["!בעסיאַטאַ","!דישמאַיאַ"],"P"],"בע\"ה":[["בעזרת","השם"],"E"],"בעז\"ה":[["בעזרת","השם"],"E"],"בעזה\"י":[["בעזרת","השם","יתברך"],"E"],"בל\"נ":[["בלי","נדר"],"E"],"ב\"ב":[["!באַוואַ","!באַסראַ"],"M"],"ב\"ק":[["בבא","קמא"],"M"],"ב\"מ":[["בבא","מציעא"],"M"],"עבו\"ז":[["עבודה","זרה"],"M"],"ר\"ה":[["ראש","השנה"],"M"],"מו\"ק":[["מועד","קטן"],"M"],"יוה\"כ":[["!יום","!כיפור"],"P"],"יו\"כ":[["!יום","!כיפור"],"P"],"יו\"ט":[["!יום","!טוב"],"P"],"ש\"ק":[["!שבת","!קודש"],"P"],"עש\"ק":[["!ערב","!שבת","!קודש"],"P"],"מוצ\"ש":[["!מוצאי","!שבת"],"P"],"מוצש\"ק":[["!מוצאי","!שבת","!קודש"],"P"],"ער\"ח":[["!ערב","!ראש","!חודש"],"P"],"חוה\"מ":[["!חול","!המועד"],"P"],"שמח\"ת":[["!שמחת","!תורה"],"P"],"ת\"ת":[["!תלמוד","!תורה"],"P"],"ת\"ח":[["!תלמיד","!חכם"],"P"],"בהכ\"נ":[["!בית","!הכנסת"],"P"],"ביהכ\"נ":[["!בית","!הכנסת"],"P"],"בהמ\"ד":[["!בית","!המדרש"],"P"],"ביהמ\"ד":[["!בית","!המדרש"],"P"],"ביהמ\"ק":[["!בית","!המקדש"],"P"],"בי\"ד":[["!בית","!דין"],"P"],"עוה\"ב":[["!עולם","!הבא"],"P"],"עוה\"ז":[["!עולם","!הזה"],"P"],"יצה\"ר":[["!יצר","!הרע"],"P"],"יצ\"ה":[["!יצר","!הרע"],"P"],"יצ\"ט":[["!יצר","!טוב"],"P"],"א\"י":[["!ארץ","!ישראל"],"P"],"אה\"ק":[["!ארץ","!הקודש"],"P"],"ח\"ו":[["!חס","!ושלום"],"P"],"חו\"ש":[["!חס","!ושלום"],"P"],"רבש\"ע":[["!רבונו","!של","!עולם"],"P"],"בעה\"ב":[["!באלעבאס"],"W"],"בעש\"ט":[["!בעל","!שם","!טוב"],"P"],"ב\"י":[["בית","יוסף"],"E"],"בעה\"ת":[["בעל","התוספות"],"E"],"ודו\"ק":[["ודוק"],"E"],"דו\"ק":[["דוק"],"E"],"סד\"ה":[["סוף","דיבור","המתחיל"],"E"],"תד\"ה":[["תוספות","דיבור","המתחיל"],"E"],"ד\"א":[["דבר","אחר"],"E"],"ד\"ת":[["דברי","תורה"],"E"],"הנ\"ל":[["!האַנאַזקאַר","!לעיל"],"W"],"כנ\"ל":[["כנזכר","לעיל"],"E"],"הי\"ד":[["השם","יקום","דמו"],"E"],"הר\"ר":[["הרב","רבי"],"E"],"הרה\"ק":[["הרב","הקדוש"],"E"],"הרה\"ג":[["הרב","הגאון"],"E"],"הגה\"ק":[["הגאון","הקדוש"],"E"],"הגה\"צ":[["הגאון","הצדיק"],"E"],"הרה\"צ":[["הרב","הצדיק"],"E"],"מו\"ה":[["מורנו","הרב"],"E"],"מוהר\"ר":[["מורנו","הרב","רבי"],"E"],"כ\"ק":[["כבוד","קדושת"],"E"],"אדמו\"ר":[["!אדמור"],"W"],"שליט\"א":[["!שליטא"],"W"],"זצ\"ל":[["!זאַצאַל"],"W"],"זצוק\"ל":[["!זאַצוקאַל"],"W"],"זי\"ע":[["!זעכוסוי","!יוֹגען","!אליינו"],"P"],"זיע\"א":[["!זעכוסוי","!יוֹגען","!אליינו","אמן"],"P"],"ע\"ה":[["עליו","השלום"],"E"],"נ\"ע":[["נשמתו","עדן"],"E"],"נ\"י":[["נרו","יאיר"],"E"],"שי'":[["שיחיה"],"E"],"חז\"ל":[["!כאַזאַל"],"W"],"רז\"ל":[["רבותינו","זכרונם","לברכה"],"E"],"אחז\"ל":[["אמרו","חכמינו","זכרונם","לברכה"],"E"],"עי\"ז":[["!אַל","!יעדיי","!זע"],"P"],"עפ\"י":[["על","פי"],"E"],"ע\"פ":[["על","פי"],"E"],"ע\"ד":[["על","דרך"],"E"],"עד\"ז":[["על","דרך","זה"],"E"],"עכ\"ל":[["!אד","!קאן","לשונו"],"E"],"עכ\"ד":[["!אד","!קאן","דבריו"],"E"],"עכת\"ד":[["!אד","!קאן","תוכן","דבריו"],"E"],"ע\"ש":[["עיין","!שאם"],"E"],"עיי\"ש":[["עיין","!שאם"],"E"],"ע'":[["עיין"],"E"],"עי'":[["עיין"],"E"],"וע\"ע":[["ועיין","עוד"],"E"],"ע\"ע":[["עיין","עוד"],"E"],"צ\"ע":[["צריך","עיון"],"E"],"צ\"ל":[["!צוֹריך","!לוֹמאַר"],"W"],"נ\"ל":[["נראה","לי"],"E"],"נ\"מ":[["נפקא","מינה"],"E"],"נפ\"מ":[["נפקא","מינה"],"E"],"מ\"ט":[["מאי","טעמא"],"E"],"מנ\"ל":[["מנא","לן"],"E"],"מה\"ט":[["מהאי","טעמא"],"E"],"מש\"כ":[["מה","שכתב"],"E"],"כמש\"כ":[["כמו","שכתב"],"E"],"כמ\"ש":[["כמו","שכתוב"],"E"],"כ\"כ":[["כל","כך"],"E"],"כש\"כ":[["כל","שכן"],"E"],"מכ\"ש":[["מכל","שכן"],"E"],"וק\"ל":[["וקל","להבין"],"E"],"א\"ש":[["אתי","שפיר"],"E"],"א\"ת":[["אם","תאמר"],"E"],"י\"א":[["יש","אומרים"],"E"],"י\"מ":[["יש","מפרשים"],"E"],"י\"ס":[["יש","ספרים"],"E"],"ל\"ק":[["לא","קשיא"],"E"],"ל\"ש":[["לא","שנא"],"E"],"ממ\"נ":[["ממה","נפשך"],"E"],"מ\"ש":[["מאי","שנא"],"E"],"ר\"ל":[["רוצה","לומר"],"E"],"רשב\"ם":[["!ראַשבאַם"],"W"],"רשב\"ג":[["רבן","שמעון","בן","גמליאל"],"E"],"ריב\"ל":[["רבי","יהושע","בן","לוי"],"E"],"ריב\"ש":[["!ריוואַש"],"W"],"רי\"ף":[["!ריף"],"W"],"ראב\"ד":[["!ראַאַוואַד"],"W"],"ראב\"ע":[["!עווען","!עזראַ"],"W"],"רמ\"א":[["!רעמוֹ"],"W"],"ש\"ך":[["!שאַך"],"W"],"ט\"ז":[["!טאַז"],"W"],"מג\"א":[["מגן","אברהם"],"E"],"מ\"ב":[["משנה","ברורה"],"E"],"באה\"ל":[["ביאור","הלכה"],"E"],"שעה\"צ":[["שער","הציון"],"E"],"באה\"ט":[["באר","היטב"],"E"],"פמ\"ג":[["פרי","מגדים"],"E"],"ערוה\"ש":[["ערוך","השלחן"],"E"],"קצשו\"ע":[["קיצור","!שילכן","!ארוך"],"E"],"חת\"ס":[["חתם","סופר"],"E"],"נוב\"י":[["נודע","ביהודה"],"E"],"פנ\"י":[["פני","יהושע"],"E"],"מהרש\"א":[["!מאַרשוֹ"],"W"],"מהרש\"ל":[["!מאַהאַרשאַל"],"W"],"מהר\"ל":[["!מאַהאַראַל"],"W"],"מהרי\"ט":[["!מאַהאַריט"],"W"],"מהרי\"ל":[["!מאַהאַריל"],"W"],"הגר\"א":[["!האַגראַ"],"W"],"האר\"י":[["!האַרי"],"W"],"האריז\"ל":[["!האַריזאַל"],"W"],"אריז\"ל":[["!אַריזאַל"],"W"],"אוה\"ח":[["אור","החיים"],"E"],"תנ\"ך":[["!טאַנאַך"],"W"],"תשב\"ר":[["תינוקות","של","בית","רבן"],"E"],"מ\"ע":[["מצות","עשה"],"E"],"מצ\"ע":[["מצות","עשה"],"E"],"ל\"ת":[["לא","תעשה"],"E"],"מל\"ת":[["מצות","לא","תעשה"],"E"],"סה\"ק":[["ספרים","הקדושים"],"E"],"ספה\"ק":[["ספרים","הקדושים"],"E"],"עש\"ן":[["עולם","שנה","נפש"],"E"],"יתב\"ש":[["יתברך","שמו"],"E"],"ית\"ש":[["יתברך","שמו"],"E"],"ית'":[["יתברך"],"E"],"וכדו'":[["וכדומה"],"E"],"וכיו\"ב":[["וכיוצא","בזה"],"E"],"כה\"ג":[["כהאי","גוונא"],"E"],"וכה\"ג":[["וכהאי","גוונא"],"E"],"בכה\"ג":[["בכהאי","גוונא"],"E"],"אח\"כ":[["אחר","כך"],"E"],"ואח\"כ":[["ואחר","כך"],"E"],"לאח\"ז":[["לאחר","זה"],"E"],"אעפ\"כ":[["אף","על","פי","כן"],"E"],"אעפ\"י":[["אף","על","פי"],"E"],"אפי'":[["אפילו"],"E"],"וז\"ל":[["וזה","לשונו"],"E"],"ז\"א":[["זאת","אומרת"],"E"],"ה\"ה":[["!הו","הדין"],"E"],"בד\"א":[["במה","דברים","אמורים"],"E"],"בד\"כ":[["בדרך","כלל"],"E"],"בדר\"כ":[["בדרך","כלל"],"E"],"בכ\"מ":[["בכל","מקום"],"E"],"בפ\"ע":[["בפני","עצמו"],"E"],"בפנ\"ע":[["בפני","עצמו"],"E"],"לכאו'":[["לכאורה"],"E"],"להד\"ם":[["לא","היו","דברים","מעולם"],"E"],"עאכו\"כ":[["על","אחת","כמה","וכמה"],"E"],"ק\"ק":[["קהלא","קדישא"],"E"],"ג\"ע":[["גן","עדן"],"E"],"לע\"נ":[["לעילוי","נשמת"],"E"],"כדאי'":[["כדאיתא"],"E"],"שנא'":[["שנאמר"],"E"],"כתי'":[["כתיב"],"E"],"פי'":[["פירוש"],"E"],"פרש\"י":[["פירש","!ראשי"],"E"],"בפרש\"י":[["בפירוש","!ראשי"],"E"],"תוי\"ט":[["תוספות","יום","טוב"],"E"],"רע\"ב":[["!באַרטענוראַ"],"W"],"זוה\"ק":[["זוהר","הקדוש"],"E"],"זח\"א":[["זוהר","חלק","!אַלעף"],"E"],"זח\"ב":[["זוהר","חלק","!בייס"],"E"],"זח\"ג":[["זוהר","חלק","!גימל"],"E"],"תקו\"ז":[["תיקוני","זוהר"],"E"],"לקו\"ת":[["ליקוטי","תורה"],"E"],"לקו\"ש":[["ליקוטי","שיחות"],"E"],"לקו\"מ":[["ליקוטי","!מאַהאַראַן"],"E"],"אגה\"ק":[["אגרת","הקודש"],"E"],"ירו'":[["ירושלמי"],"E"],"ירושל'":[["ירושלמי"],"E"],"מתני'":[["!מאסניסין"],"L"],"גמ'":[["!געמורע"],"L"],"ח\"א":[["חלק","!אַלעף"],"E"],"ח\"ב":[["חלק","!בייס"],"E"],"ח\"ג":[["חלק","!גימל"],"E"],"ח\"ד":[["חלק","!דאַלעד"],"E"],"ח\"ה":[["חלק","!היי"],"E"],"ב\"ר":[["בראשית","רבה"],"B"],"שמו\"ר":[["שמות","רבה"],"B"],"ויק\"ר":[["ויקרא","רבה"],"B"],"במ\"ר":[["במדבר","רבה"],"B"],"דב\"ר":[["דברים","רבה"],"B"],"קה\"ר":[["קהלת","רבה"],"B"],"שהש\"ר":[["שיר","השירים","רבה"],"B"],"איכ\"ר":[["איכה","רבה"],"B"],"ברכ'":[["ברכות"],"M"],"עירו'":[["עירובין"],"M"],"פסח'":[["פסחים"],"M"],"סוכ'":[["סוכה"],"M"],"ביצ'":[["ביצה"],"M"],"תענ'":[["תענית"],"M"],"מגי'":[["מגילה"],"M"],"חגי'":[["חגיגה"],"M"],"יבמ'":[["יבמות"],"M"],"כתו'":[["כתובות"],"M"],"כתוב'":[["כתובות"],"M"],"נדר'":[["נדרים"],"M"],"נזי'":[["נזיר"],"M"],"סוט'":[["סוטה"],"M"],"גיט'":[["גיטין"],"M"],"קידו'":[["קידושין"],"M"],"קדו'":[["קידושין"],"M"],"סנה'":[["סנהדרין"],"M"],"סנהד'":[["סנהדרין"],"M"],"מכ'":[["מכות"],"M"],"שבו'":[["שבועות"],"M"],"הור'":[["הוריות"],"M"],"זבח'":[["זבחים"],"M"],"מנח'":[["מנחות"],"M"],"חול'":[["חולין"],"M"],"בכו'":[["בכורות"],"M"],"בכור'":[["בכורות"],"M"],"ערכ'":[["ערכין"],"M"],"תמו'":[["תמורה"],"M"],"כרי'":[["כריתות"],"M"],"כרית'":[["כריתות"],"M"],"מעי'":[["!מעילע"],"M"],"שמו\"א":[["שמואל","!אַלעף"],"B"],"שמו\"ב":[["שמואל","!בייס"],"B"],"מל\"א":[["מלכים","!אַלעף"],"B"],"מל\"ב":[["מלכים","!בייס"],"B"],"דה\"י":[["דברי","הימים"],"B"],"דהי\"א":[["דברי","הימים","!אַלעף"],"B"],"דהי\"ב":[["דברי","הימים","!בייס"],"B"],"תה'":[["תהלים"],"B"],"תהי'":[["תהלים"],"B"],"תהל'":[["תהלים"],"B"],"ישע'":[["ישעיה"],"B"],"ישעי'":[["ישעיה"],"B"],"ירמ'":[["ירמיה"],"B"],"ירמי'":[["ירמיה"],"B"],"יחז'":[["יחזקאל"],"B"],"יחזק'":[["יחזקאל"],"B"],"שה\"ש":[["שיר","השירים"],"B"],"קה'":[["קהלת"],"B"],"קהל'":[["קהלת"],"B"],"משל'":[["משלי"],"B"],"בראש'":[["בראשית"],"B"],"במד'":[["במדבר"],"B"],"ויק'":[["ויקרא"],"B"],"דבר'":[["דברים"],"B"],"יהו'":[["יהושע"],"B"],"שופ'":[["שופטים"],"B"],"זכר'":[["זכריה"],"B"],"נחמ'":[["נחמיה"],"B"],"הק'":[["הקדוש"],"E"],"אל\"כ":[["אם","לא","כן"],"E"],"ס\"ד":[["!סאלקא","!דאטאך"],"L"],"קס\"ד":[["!קא","!סאלקא","!דאטאך"],"E"],"וי\"ל":[["!וועיעש","!לוימער"],"L"],"וא\"ת":[["!וועאים","!טוימער"],"L"],"אע\"ג":[["!אף","!על","!גאוו"],"L"],"א\"כ":[["!אים","!קען"],"L"],"אע\"פ":[["!אף","!על","!פי"],"L"],"מ\"מ":[["!מיקאל","!מאקוים"],"L"],"ואע\"ג":[["!וועאף","!על","!גאוו"],"L"],"בפ\"ק":[["!בעפיירעק","!קאמא"],"L"],"לר\"י":[["!לעריי"],"L"],"ר\"ת":[["!ראבייני","!טאם"],"L"],"ר\"י":[["!ריי"],"L"],"למ\"ד":[["!לעמאן","!דאמער"],"L"],"ע\"י":[["!על","!יעדי"],"L"],"י\"ל":[["!יעש","!לוימער"],"L"],"דא\"כ":[["!דאים","!קען"],"L"],"וא\"כ":[["!וועאים","!קען"],"L"],"רש\"י":[["!ראשי"],"L"],"א\"נ":[["!אי","!נאמי"],"L"],"ב\"ד":[["!בייס","!דין"],"L"],"ר\"ש":[["!רעבי","!שימען"],"L"],"ה\"נ":[["!האכי","!נאמי"],"L"],"ר\"מ":[["!רעבי","!מייער"],"L"],"קמ\"ל":[["!קא","!מאשמא","!לאן"],"L"],"ש\"מ":[["!שמא","!מינע"],"L"],"ע\"כ":[["!על","!קארכאך"],"L"],"דאע\"ג":[["!דאף","!על","!גאוו"],"L"],"הש\"ס":[["!האשאס"],"L"],"א\"ל":[["!אומער","!לייע"],"L"],"פ\"ה":[["!פיירעש","!האקינטרעס"],"L"],"ק\"ו":[["!קאל","!וואכוימער"],"L"],"א\"ר":[["!אומער","!רעבי"],"L"],"ר\"ח":[["!ראבייני","!כאנאנעל"],"L"],"וה\"ה":[["!וועהו","!הדין"],"L"],"בפ\"ב":[["!בעפיירעק","!בייס"],"L"],"פ\"ק":[["!פיירעק","!קאמא"],"L"],"לר\"ת":[["!לעראבייני","!טאם"],"L"],"ור\"ת":[["!וועראבייני","!טאם"],"L"],"כ\"ש":[["!קאל","!שקיין"],"L"],"ר\"א":[["!רעבי","!עליעזער"],"L"],"ר\"ע":[["!רעבי","!עקיווע"],"L"],"ס\"ל":[["!סוואווער","!לייע"],"L"],"ד\"ה":[["!דיבור","!האמאסכיל"],"L"],"ת\"ל":[["!טאלמיד","!לוימער"],"L"],"ה\"מ":[["!האני","!מילי"],"L"],"ב\"ש":[["!בייס","!שאמאי"],"L"],"ומ\"מ":[["!אומיקאל","!מאקוים"],"L"],"תוס'":[["!טויספעס"],"L"],"ת\"ש":[["!טא","!שמא"],"L"],"א\"ה":[["!אי","!האכי"],"L"],"ת\"ר":[["!טאנו","!ראבונען"],"L"],"מ\"ד":[["!מאן","!דאמער"],"L"],"כ\"ע":[["!קילי","!אלמע"],"L"],"לכ\"ע":[["!לעקילי","!אלמע"],"L"],"ואע\"פ":[["!וועאף","!על","!פי"],"L"],"אפ\"ה":[["!אפילו","!האכי"],"L"],"ואפ\"ה":[["!וועאפילו","!האכי"],"L"],"כר\"ש":[["!קעראבי","!שימען"],"L"],"ש\"ס":[["!שאס"],"L"],"דגרסי'":[["!דגארסי"],"L"],"ב\"ה":[["!בייס","!הילל"],"L"],"ה\"א":[["!הוו","!אמינא"],"L"],"ע\"ז":[["!אוויידע","!זורע"],"L"],"במתני'":[["!בעמאסניסין"],"L"],"ק\"ש":[["!קריאס","!שמא"],"L"],"הקב\"ה":[["!האקאדויש","!בורעכו"],"L"],"ר'":[["!רעבי"],"L"],"וגו'":[["!וועגוי"],"L"],"כו'":[["!קוי"],"L"],"וכו'":[["!וועכוי"],"L"],"ז\"ל":[["!זאל"],"L"],"מהר\"ם":[["!מאהאראם"],"L"],"רמב\"ם":[["!ראמבאם"],"L"],"רמב\"ן":[["!ראמבאן"],"L"],"רשב\"א":[["!ראשבע"],"L"],"ריטב\"א":[["!ריטווע"],"L"],"ר\"ן":[["!ראן"],"L"],"רא\"ש":[["!ראש"],"L"],"שו\"ע":[["!שילכן","!ארוך"],"L"],"ת\"ק":[["!טאנע","!קאמע"],"L"]},"names":{"ברכות":[[["ברכות"],"M"]],"שבת":[[["שבת"],"M"]],"עירובין":[[["עירובין"],"M"]],"פסחים":[[["פסחים"],"M"]],"שקלים":[[["שקלים"],"M"]],"יומא":[[["יומא"],"M"]],"סוכה":[[["סוכה"],"M"]],"ביצה":[[["ביצה"],"M"]],"ראש":[[["ראש","השנה"],"M"]],"תענית":[[["תענית"],"M"]],"מגילה":[[["מגילה"],"M"]],"מועד":[[["מועד","קטן"],"M"]],"חגיגה":[[["חגיגה"],"M"]],"יבמות":[[["יבמות"],"M"]],"כתובות":[[["כתובות"],"M"]],"נדרים":[[["נדרים"],"M"]],"נזיר":[[["נזיר"],"M"]],"סוטה":[[["סוטה"],"M"]],"גיטין":[[["גיטין"],"M"]],"קידושין":[[["קידושין"],"M"]],"בבא":[[["בבא","קמא"],"M"],[["בבא","מציעא"],"M"],[["בבא","בתרא"],"M"]],"סנהדרין":[[["סנהדרין"],"M"]],"מכות":[[["מכות"],"M"]],"שבועות":[[["שבועות"],"M"]],"עבודה":[[["עבודה","זרה"],"M"]],"הוריות":[[["הוריות"],"M"]],"זבחים":[[["זבחים"],"M"]],"מנחות":[[["מנחות"],"M"]],"חולין":[[["חולין"],"M"]],"בכורות":[[["בכורות"],"M"]],"ערכין":[[["ערכין"],"M"]],"תמורה":[[["תמורה"],"M"]],"כריתות":[[["כריתות"],"M"]],"מעילה":[[["מעילה"],"M"]],"תמיד":[[["תמיד"],"M"]],"נדה":[[["נדה"],"M"]],"ירושלמי":[[["ירושלמי"],"M"]],"תוספתא":[[["תוספתא"],"M"]],"בראשית":[[["בראשית"],"B"]],"שמות":[[["שמות"],"B"]],"ויקרא":[[["ויקרא"],"B"]],"במדבר":[[["במדבר"],"B"]],"דברים":[[["דברים"],"B"]],"יהושע":[[["יהושע"],"B"]],"שופטים":[[["שופטים"],"B"]],"שמואל":[[["שמואל"],"B"]],"מלכים":[[["מלכים"],"B"]],"ישעיה":[[["ישעיה"],"B"]],"ישעיהו":[[["ישעיהו"],"B"]],"ירמיה":[[["ירמיה"],"B"]],"ירמיהו":[[["ירמיהו"],"B"]],"יחזקאל":[[["יחזקאל"],"B"]],"הושע":[[["הושע"],"B"]],"יואל":[[["יואל"],"B"]],"עמוס":[[["עמוס"],"B"]],"עובדיה":[[["עובדיה"],"B"]],"יונה":[[["יונה"],"B"]],"מיכה":[[["מיכה"],"B"]],"נחום":[[["נחום"],"B"]],"חבקוק":[[["חבקוק"],"B"]],"צפניה":[[["צפניה"],"B"]],"חגי":[[["חגי"],"B"]],"זכריה":[[["זכריה"],"B"]],"מלאכי":[[["מלאכי"],"B"]],"תהלים":[[["תהלים"],"B"]],"תהילים":[[["תהילים"],"B"]],"משלי":[[["משלי"],"B"]],"איוב":[[["איוב"],"B"]],"שיר":[[["שיר","השירים"],"B"]],"רות":[[["רות"],"B"]],"איכה":[[["איכה"],"B"]],"קהלת":[[["קהלת"],"B"]],"אסתר":[[["אסתר"],"B"]],"דניאל":[[["דניאל"],"B"]],"עזרא":[[["עזרא"],"B"]],"נחמיה":[[["נחמיה"],"B"]],"דברי":[[["דברי","הימים"],"B"]],"מכילתא":[[["מכילתא"],"B"]],"ספרא":[[["ספרא"],"B"]],"ספרי":[[["ספרי"],"B"]],"תנחומא":[[["תנחומא"],"B"]],"זוהר":[[["זוהר"],"B"]]},"markers":{"דף":[["דף"],"daf"],"עמוד":[["עמוד"],"amud"],"עמ'":[["עמוד"],"amud"],"פרק":[["פרק"],"ref"],"פ'":[["פרק"],"ref"],"סימן":[["סימן"],"ref"],"סי'":[["סימן"],"ref"],"סעיף":[["סעיף"],"ref"],"סע'":[["סעיף"],"ref"],"ס\"ק":[["סעיף","קטן"],"ref"],"סק\"":[["סעיף","קטן"],"ref"],"הלכה":[["הלכה"],"ref"],"הל'":[["הלכות"],"refname"],"הלכות":[["הלכות"],"refname"],"משנה":[["משנה"],"ref"],"פסוק":[["פסוק"],"ref"],"פס'":[["פסוק"],"ref"],"אות":[["אות"],"ref"],"או'":[["אות"],"ref"],"חלק":[["חלק"],"ref"],"שורה":[["שורה"],"ref"],"מסכת":[["מסכת"],"refname"],"מס'":[["מסכת"],"refname"],"שער":[["שער"],"ref"]},"ref_mode":"letters","yi_fw":["א","אַ","אַן","אבער","אדער","אהין","אהער","אוועק","אויב","אויך","אויס","אויף","און","אונז","אונטער","אז","אזוי","איבער","איז","אייך","איך","אים","איצט","איר","אלטע","אלע","אלעס","אלץ","אמאל","אן","אנדערע","אנדערש","אפט","אפילו","ארויס","ארום","אריין","באקומען","ביז","ביי","בין","ביסט","ברענגט","גאנץ","גאר","גארנישט","גוט","גיבט","גייט","גיין","געהאט","געווארן","געווען","געזאגט","געלערנט","גרויס","דאך","דאס","דארט","דארף","דארפן","דו","די","דיין","דעם","דעמאלט","דער","האב","האבן","האט","האלט","האלטן","היינט","וואס","ווי","ווייל","ווייס","ווייסט","וויל","וויסן","וויפיל","וועט","וועל","וועלכע","וועלכער","וועלן","ווען","ווערט","ווערן","זאגט","זאגן","זאך","זאכן","זאל","זאלן","זי","זיי","זיין","זייער","זייערע","זיך","זיכער","זעט","זענט","זענען","זעען","טאקע","טוט","טון","יא","יעדע","יעצט","לאמיר","ליינט","לערנט","לערנען","מאהל","מאכט","מאכן","מאל","מוז","מוזן","מיט","מיין","מיר","מען","מענטש","מענטשן","מער","נאך","נאכאמאל","נאר","נו","ניט","ניין","נייע","נישט","נעמט","ס'איז","עמיצער","ענטפערט","עפעס","ער","ערשטע","פאר","פון","פרעגט","פרעגן","צו","צוריק","קומט","קומען","קיין","קיינער","קליין","קען","קענען","רעדט","רעדן","שוין","שטייט","שלעכט","שרייבט"],"he_fw":["אבל","אותה","אותו","אותם","אחר","אחרי","איך","איתמר","אך","אל","אלא","אלה","אלו","אם","אמר","אנו","אנחנו","אשר","את","אתה","בה","בו","בזה","בין","גם","דהא","דהיינו","דתניא","ההוא","ההיא","הוא","הזאת","הזה","היא","היה","היינו","היכי","היתה","הכי","הם","הן","הנה","ואם","והוא","והיא","והנה","וזה","וזהו","וכן","ולא","ולכן","ועוד","ועל","זאת","זה","יהיה","יש","כאשר","כי","כל","כמו","כן","לא","לה","לו","לזה","ליה","לכן","למה","לפי","מאד","מאי","מה","מזה","מי","ממנו","מן","משום","נמי","עד","עוד","על","עם","קא","רק","שהוא","שהיא","שהם","של","שלא","תחת","תניא","תנן"],"ref_words":["אות","דף","הלכה","הלכות","חלק","מסכת","משנה","סימן","סעיף","עמוד","פסוק","פרק","קטן","שורה"],"lk_vowels":"off","lk_common":{"משה":"מוישע","ישראל":"יִסראָעל","אלקים":"עלאָקים","אלקינו":"עלאָקיינו","אלקיך":"עלאָקעך","ויהי":"וואיעהי","לא":"לױ","ולא":"וועלױ","שלא":"שעלױ","הוא":"הי","והוא":"וועהי","שהוא":"שעהי","היא":"הי","כי":"קי","אדם":"אָדעם","האדם":"האָאָדעם","תורה":"טוירע","התורה":"האַטוירע","מצוה":"מיצווע","המצוה":"האַמיצווע","אהבה":"אַהאָווע","יראה":"יִראָע","עולם":"אוילעם","העולם":"האָאוילעם","חסד":"כעסעד","אמת":"עמעס","איך":"אייך","ואיך":"וועאייך","שמש":"שימייש","לזקני":"ליזיקניי","זקני":"זיקניי","בשבעת":"בעשיוועס","שבעת":"שיוועס","עצמו":"אצמוי","עצמך":"אצמעך","נודע":"נוידא","אשר":"אשער","כאשר":"קאאשער","ואשר":"וועאשער","לבן":"לאוואן"}};
+/* Kol engine for ivelt (Tab, Nov 2026): the pocket voice, run on this device (extension offscreen page or userscript).
+   Needs: ort (ONNX Runtime Web 1.17 wasm), KolText (pocket-text.js), KolTokens (pocket.js).
+   SOURCE (set by the host): manifest() -> {config, sha, text_version, built, bytes}; textData(ver) -> object;
+   model(onProgress) -> Uint8Array; wasmPaths(threads) -> string | {file: url}. Nothing is sent to any server. */
+(function (root) {
+  "use strict";
+  var SOURCE = null, sess = null, cfg = null, man = null, SR = 22050, loading = null, threadsUsed = 1;
+  var STRETCH = [1.0, 0.9];                       // normal pace; the second number is for loshn-koydesh-heavy pieces (same as /pocket/)
+  var listeners = [];
+  function emit(e) { listeners.forEach(function (f) { try { f(e); } catch (x) {} }); }
+  function status(t, extra) { emit(Object.assign({ type: "status", text: t }, extra || {})); }
+  async function createSession(model, threads) {
+    ort.env.wasm.numThreads = threads; ort.env.wasm.wasmPaths = await SOURCE.wasmPaths(threads > 1);
+    return ort.InferenceSession.create(model, { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+  }
+  var loadStage = "";
+  function load() {
+    if (loading) return loading;
+    loading = (async function () {
+      var t0 = Date.now(), model;
+      function st(n) { loadStage = n; }
+      try {
+        st("voice info"); man = await SOURCE.manifest(); cfg = man.config; SR = cfg.audio.sample_rate;
+        st("text rules"); KolText.init(await SOURCE.textData(man.text_version));
+        st("voice file"); model = await SOURCE.model(function (got, total) { status("Loading the voice " + Math.round(100 * got / total) + "%", { pct: Math.round(100 * got / total) }); });
+        status("Starting the voice…");
+        st("engine");
+        var want = (root.crossOriginIsolated && !SOURCE.noThreads) ? Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2))) : 1;
+        try { sess = await createSession(model, want); threadsUsed = want; }
+        catch (e) { if (want === 1) throw e; sess = await createSession(model, 1); threadsUsed = 1; }
+      } catch (e) { var er = e instanceof Error ? e : new Error(String(e && e.message || e)); er.kolStage = loadStage; throw er; }
+      root.KOL_ENGINE_LOAD = { ms: Date.now() - t0, threads: threadsUsed, mb: +(model.length / 1048576).toFixed(1) };
+      loadStage = "ready"; status("ready", { ready: true });
+      return sess;
+    })();
+    loading.catch(function (e) { loading = null; status("Could not load the voice (" + (e && e.kolStage || "") + "): " + (e && e.message || e), { error: true }); });
+    return loading;
+  }
+  var lastStats = null;
+  function trimLevel(w) {
+    var pk = 0, i, nan = 0; for (i = 0; i < w.length; i++) { var a0 = Math.abs(w[i]); if (a0 !== a0) { nan++; continue; } if (a0 > pk) pk = a0; }
+    lastStats = { n: w.length, peak: +pk.toFixed(4), nan: nan, type: w.constructor && w.constructor.name };
+    if (nan) { w = Float32Array.from(w, function (x) { return x === x ? x : 0; }); }
+    if (pk < 1e-5) return w;
+    var thr = pk * 0.0126, a = 0, b = w.length - 1, keep = Math.round(0.03 * SR);
+    while (a < w.length && Math.abs(w[a]) < thr) a++; while (b > a && Math.abs(w[b]) < thr) b--;
+    a = Math.max(0, a - keep); b = Math.min(w.length, b + keep);
+    if (b - a > 0.2 * SR) w = w.subarray(a, b);
+    var t2 = 0.02 * pk, s = 0, n = 0; for (i = 0; i < w.length; i++) if (Math.abs(w[i]) > t2) { s += w[i] * w[i]; n++; }
+    var rms = Math.sqrt(s / Math.max(1, n)) + 1e-9, g = Math.min(4, Math.pow(10, -20 / 20) / rms), out = new Float32Array(w.length), p2 = 0;
+    for (i = 0; i < w.length; i++) { out[i] = w[i] * g; p2 = Math.max(p2, Math.abs(out[i])); }
+    if (p2 > 0.97) for (i = 0; i < out.length; i++) out[i] *= 0.97 / p2;
+    var fade = Math.min(Math.round(0.02 * SR), out.length >> 2);
+    for (i = 0; i < fade; i++) { out[i] *= i / fade; out[out.length - 1 - i] *= i / fade; }
+    return out;
+  }
+  async function synthPiece(p, speed) {
+    var x = KolTokens.ids(p.tts, cfg.phoneme_id_map); if (x.length < 5) return null;
+    var f = STRETCH[p.lk >= 0.5 ? 1 : 0] * (speed || 1), inf = cfg.inference;
+    var feeds = { input: new ort.Tensor("int64", BigInt64Array.from(x.map(BigInt)), [1, x.length]),
+      input_lengths: new ort.Tensor("int64", BigInt64Array.from([BigInt(x.length)]), [1]),
+      scales: new ort.Tensor("float32", Float32Array.from([inf.noise_scale, inf.length_scale / f, inf.noise_w]), [3]) };
+    var r = await sess.run(feeds), d = r.output.data;
+    if (!(d instanceof Float32Array)) d = Float32Array.from(d);
+    return trimLevel(d);
+  }
+  // ---------- player: sentences are made one after another, a little ahead of what is playing ----------
+  var actx = null, gen = 0, sources = [], ticker = null, job = null;
+  function ctx() {
+    if (!actx || actx.state === "closed") { var AC = root.AudioContext || root.webkitAudioContext; actx = new AC(); }
+    return actx;
+  }
+  // iPhone: Web Audio is silenced by the ring/silent switch unless the page's audio session is "playback".
+  // Setting navigator.audioSession (iOS 17+) and playing a silent looping <audio> element inside the tap both switch it.
+  var keepEl = null, SILENT_WAV = null;
+  function silentWav() {
+    if (SILENT_WAV) return SILENT_WAV;
+    var n = 2205, b = new ArrayBuffer(44 + n * 2), v = new DataView(b), i, w = function (o, s) { for (i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, 22050, true); v.setUint32(28, 44100, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+    var u = new Uint8Array(b), s = ""; for (i = 0; i < u.length; i++) s += String.fromCharCode(u[i]);
+    SILENT_WAV = "data:audio/wav;base64," + btoa(s); return SILENT_WAV;
+  }
+  var unlockInfo = { session: "", element: "", ctx: "" };
+  function unlock() {
+    try { if (navigator.audioSession && navigator.audioSession.type !== "playback") { navigator.audioSession.type = "playback"; } unlockInfo.session = navigator.audioSession ? navigator.audioSession.type : "n/a"; } catch (e) { unlockInfo.session = "err " + e.message; }
+    try {
+      if (!keepEl) { keepEl = document.createElement("audio"); keepEl.setAttribute("playsinline", ""); keepEl.setAttribute("x-webkit-airplay", "deny"); keepEl.loop = true; keepEl.preload = "auto"; keepEl.src = silentWav(); }
+      keepEl.muted = false; keepEl.volume = 1;
+      var pp = keepEl.play(); if (pp && pp.then) pp.then(function () { unlockInfo.element = "playing"; }, function (x) { unlockInfo.element = "blocked: " + (x && x.message || x); });
+    } catch (e) { unlockInfo.element = "err " + e.message; }
+    try {
+      var c = ctx(); if (c.state !== "running") { var r = c.resume(); if (r && r.catch) r.catch(function () {}); }
+      var b = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0);
+      unlockInfo.ctx = c.state; outPlay();
+    } catch (e) { unlockInfo.ctx = "err " + e.message; }
+  }
+  // optional sound path for iPhone: Web Audio → a <audio> element (⚙️ "sound path"); the default goes straight to the speaker
+  var OUT = { mode: "ctx", el: null, md: null };
+  try { OUT.mode = root.localStorage.getItem("kol-ivelt-out") || "ctx"; } catch (e) {}
+  function outNode(c) {
+    if (OUT.mode !== "element" || !c.createMediaStreamDestination) return c.destination;
+    if (!OUT.md || OUT.md.context !== c) { OUT.md = c.createMediaStreamDestination(); if (!OUT.el) { OUT.el = document.createElement("audio"); OUT.el.setAttribute("playsinline", ""); OUT.el.autoplay = true; } OUT.el.srcObject = OUT.md.stream; }
+    return OUT.md;
+  }
+  function outPlay() { if (OUT.mode === "element") { try { outNode(ctx()); var p = OUT.el.play(); if (p && p.catch) p.catch(function () {}); } catch (e) {} } }
+  function releaseKeep() { try { if (keepEl && !keepEl.paused) keepEl.pause(); } catch (e) {} }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function stopAll() {
+    gen++; if (ticker) { clearInterval(ticker); ticker = null; }
+    sources.forEach(function (s) { try { s.onended = null; s.stop(); } catch (e) {} }); sources = []; job = null;
+  }
+  var relT = null;
+  async function play(o) {          // o: {id, sentences:[...], start, speed}
+    stopAll(); if (relT) { clearTimeout(relT); relT = null; } var my = gen, c = ctx(), loud = 0, nanTot = 0;
+    job = { id: o.id, marks: [], cur: -1, done: false, end: 0, paused: false };
+    var J = job;
+    if (c.state === "suspended") { try { await c.resume(); } catch (e) {} }
+    if (!sess) { emit({ type: "loading", id: o.id }); try { await load(); } catch (e) { if (my === gen) { stopAll(); emit({ type: "error", id: o.id, stage: (e && e.kolStage) || "load", text: "Could not load the voice: " + String(e && e.message || e) }); } return; } }
+    if (my !== gen) return;
+    if (c.state !== "running") { try { await c.resume(); } catch (e) {} }
+    if (c.state !== "running") emit({ type: "blocked", id: o.id });         // the browser wants a tap before sound (iPhone)
+    var t = c.currentTime + 0.12;
+    ticker = setInterval(function () {
+      if (my !== gen) return;
+      var now = c.currentTime, cur = -1;
+      for (var k = 0; k < J.marks.length; k++) if (J.marks[k].at <= now + 0.02) cur = J.marks[k].i;
+      if (cur !== J.cur && cur >= 0) { J.cur = cur; emit({ type: "sentence", id: o.id, i: cur }); }
+      if (J.done && now >= J.end) { clearInterval(ticker); ticker = null; job = null; relT = setTimeout(releaseKeep, 15000); emit({ type: "end", id: o.id }); return; }
+      if (!J.paused && J.marks.length && now === J.lastNow) { J.stuck = (J.stuck || 0) + 1; if (J.stuck === 25) { if (c.state !== "running") emit({ type: "blocked", id: o.id }); else emit({ type: "log", text: "audio clock not moving, state " + c.state }); } } else J.stuck = 0;
+      J.lastNow = now;
+    }, 120);
+    var made = 0, t0 = Date.now();
+    try {
+      for (var i = o.start || 0; i < o.sentences.length; i++) {
+        var ps = firstPieces(o.sentences[i], i === (o.start || 0)), first = true;
+        for (var j = 0; j < ps.length; j++) {
+          while (my === gen && t - c.currentTime > 6) await sleep(150);     // keep ~6 s ready ahead, no more
+          if (my !== gen) return;
+          var w = await synthPiece(ps[j], o.speed);
+          if (my !== gen) return;
+          if (!w) continue;
+          if (lastStats) { loud = Math.max(loud, lastStats.peak); nanTot += lastStats.nan; }
+          var b = c.createBuffer(1, w.length, SR); (b.copyToChannel ? b.copyToChannel(w, 0) : b.getChannelData(0).set(w));
+          var s = c.createBufferSource(); s.buffer = b; s.connect(outNode(c));
+          var at = Math.max(t, c.currentTime + 0.06); s.start(at); sources.push(s);
+          s.onended = function () { var k = sources.indexOf(this); if (k >= 0) sources.splice(k, 1); };
+          if (first) { J.marks.push({ i: i, at: at }); first = false; }
+          t = at + w.length / SR + (j < ps.length - 1 ? 0.22 : 0.42); made += w.length / SR;
+        }
+        if (first) J.marks.push({ i: i, at: Math.max(t, c.currentTime) });   // nothing to say in this sentence: still mark it
+      }
+    } catch (e) { if (my === gen) { stopAll(); emit({ type: "error", id: o.id, stage: "synth", text: String(e && e.message || e) }); } return; }
+    if (my === gen && (made < 0.05 || loud < 1e-4)) {           // the voice made no sound: say so instead of marking the post as heard
+      stopAll(); emit({ type: "error", id: o.id, stage: "synth", text: "The voice made no sound (" + (made < 0.05 ? "no audio made" : "silent audio, peak " + loud + (nanTot ? ", " + nanTot + " NaN samples" : "")) + ")" }); return; }
+    J.done = true; J.end = t - 0.3; J.stats = { audio_s: +made.toFixed(1), ms: Date.now() - t0, peak: loud, nan: nanTot };
+    emit({ type: "made", id: o.id, audio_s: J.stats.audio_s, ms: J.stats.ms, threads: threadsUsed });
+  }
+  // the first sentence is made in two halves so the first words come sooner (a long piece takes a while on a slow phone)
+  function firstPieces(s, isFirst) {
+    if (!isFirst || s.length < 70) return KolText.pieces(s);
+    var cut = s.indexOf(",", 25); if (cut < 0 || cut > 70) { cut = s.indexOf(" ", 35); }
+    if (cut < 0 || cut > s.length - 15) return KolText.pieces(s);
+    var a = s.slice(0, cut + 1).trim(), b = s.slice(cut + 1).trim();
+    if (!/[,.!?:;]$/.test(a)) a += ",";
+    return KolText.pieces(a).concat(KolText.pieces(b));
+  }
+  function pause() { if (actx && actx.state === "running") { actx.suspend(); if (job) job.paused = true; emit({ type: "paused", id: job && job.id }); } }
+  function resume() { try { if (keepEl && keepEl.paused) keepEl.play().catch(function () {}); } catch (x) {} if (actx) { actx.resume(); if (job) job.paused = false; emit({ type: "resumed", id: job && job.id }); } }
+  function stop() { var id = job && job.id; stopAll(); releaseKeep(); if (actx && actx.state === "suspended") actx.resume(); emit({ type: "stopped", id: id }); }
+  function info() { return { loaded: !!sess, threads: threadsUsed, voice: man ? { sha: man.sha, built: man.built, step: man.config && man.config.step, text_version: man.text_version, bytes: man.bytes } : null,
+    state: job ? (job.paused ? "paused" : "playing") : "idle", id: job && job.id, cur: job ? job.cur : -1 }; }
+  // self-test helpers (⚙️ 🔧)
+  async function testSynth(text) {
+    await load(); var ps = KolText.pieces(text), w = null, t0 = Date.now();
+    for (var j = 0; j < ps.length && !w; j++) w = await synthPiece(ps[j], 1);
+    return { ms: Date.now() - t0, samples: w ? w.length : 0, sec: w ? +(w.length / SR).toFixed(2) : 0, stats: lastStats, wave: w, sr: SR };
+  }
+  function testPlay(w, sr) {        // plays a wave (or a short tone) now; resolves with what the audio clock did
+    return new Promise(function (res) {
+      var c = ctx(); if (c.state !== "running") { try { c.resume(); } catch (e) {} }
+      if (!w) { sr = c.sampleRate; w = new Float32Array(Math.round(sr * 0.6)); for (var i = 0; i < w.length; i++) w[i] = 0.3 * Math.sin(2 * Math.PI * 660 * i / sr) * Math.min(1, i / 800, (w.length - i) / 800); }
+      var b = c.createBuffer(1, w.length, sr); b.getChannelData(0).set(w); var s = c.createBufferSource(); s.buffer = b; s.connect(outNode(c));
+      var t0 = c.currentTime; s.start(c.currentTime + 0.05);
+      setTimeout(function () { res({ state: c.state, clock_moved: +(c.currentTime - t0).toFixed(2), length: +(w.length / sr).toFixed(2), session: navigator.audioSession ? navigator.audioSession.type : "n/a", keep: unlockInfo.element || (keepEl ? (keepEl.paused ? "paused" : "playing") : "none"), out: OUT.mode }); }, Math.round(1000 * w.length / sr) + 400);
+    });
+  }
+  root.KolEngine = { testSynth: testSynth, testPlay: testPlay, unlockInfo: function () { return unlockInfo; }, setOut: function (m) { OUT.mode = m; OUT.md = null; try { root.localStorage.setItem("kol-ivelt-out", m); } catch (e) {} }, getOut: function () { return OUT.mode; },
+    loadStage: function () { return loadStage; }, setSource: function (s) { SOURCE = s; }, load: load, play: play, pause: pause, resume: resume, stop: stop, unlock: unlock,
+    on: function (f) { listeners.push(f); }, info: info, reset: function () { stopAll(); sess = null; loading = null; man = null; } };
+})(typeof self !== "undefined" ? self : this);
+
+;if(typeof KolEngine==='undefined'&&self.KolEngine){var KolEngine=self.KolEngine;}
+/* whisper-web.js — on-device Whisper (heimish Yiddish listener) on onnxruntime-web. No server, no GPU.
+   KolListen.load(base, onProgress) -> loads manifest.json + model parts (cached for offline use)
+   KolListen.transcribe(Float32Array 16 kHz mono) -> {text, ms, chunks}                                        */
+(function (G) {
+  "use strict";
+  var SR = 16000, NFFT = 400, HOP = 160, NFR = 3000, NS = 480000;
+  var S = { ready: false };
+  // ivelt build: the host may supply its own fetch (userscript: GM request; no CORS on Jacob's site) and ORT from its own scope
+  function FETCH(u, o) { return (G.KolListenFetch || fetch)(u, o); }
+  function ORT() { return G.ort || (typeof ort !== "undefined" ? ort : null); }
+  // ---------- log-mel (matches openai/whisper: hann 400, hop 160, power, slaney mel 80, log10, max-8, (x+4)/4) ----------
+  var HANN = new Float32Array(NFFT); for (var i = 0; i < NFFT; i++) HANN[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / NFFT);
+  var NB = NFFT / 2 + 1, COS = new Float32Array(NB * NFFT), SIN = new Float32Array(NB * NFFT);
+  for (var k = 0; k < NB; k++) for (var n = 0; n < NFFT; n++) { var a = 2 * Math.PI * k * n / NFFT; COS[k * NFFT + n] = Math.cos(a); SIN[k * NFFT + n] = Math.sin(a); }
+  function logMel(x, mel) {
+    // x: Float32Array (<= 30 s). Reflect-pad by 200 like torch.stft(center=True); frames = NFR (last frame dropped as in whisper)
+    var nmel = mel.length, out = new Float32Array(nmel * NFR), pad = NFFT / 2, buf = new Float32Array(NFFT), pw = new Float32Array(NB);
+    var L = NS, xp = new Float32Array(L + 2 * pad);
+    var nx = Math.min(x.length, NS); xp.set(x.subarray(0, nx), pad);
+    for (var i = 0; i < pad; i++) { xp[pad - 1 - i] = xp[pad + 1 + i]; xp[pad + L + i] = xp[pad + L - 2 - i]; }
+    var lastReal = Math.min(NFR, Math.ceil((nx + pad) / HOP) + 1), zeroDone = false, zeroCol = null, mx = -1e9;
+    for (var t = 0; t < NFR; t++) {
+      var col;
+      if (t > lastReal) {
+        if (!zeroDone) { zeroCol = new Float32Array(nmel); for (var m = 0; m < nmel; m++) zeroCol[m] = -10; zeroDone = true; }
+        col = zeroCol;
+      } else {
+        var o = t * HOP; for (var n2 = 0; n2 < NFFT; n2++) buf[n2] = xp[o + n2] * HANN[n2];
+        for (var k2 = 0; k2 < NB; k2++) { var re = 0, im = 0, b = k2 * NFFT; for (var n3 = 0; n3 < NFFT; n3++) { re += buf[n3] * COS[b + n3]; im -= buf[n3] * SIN[b + n3]; } pw[k2] = re * re + im * im; }
+        col = new Float32Array(nmel);
+        for (var m2 = 0; m2 < nmel; m2++) { var s0 = mel[m2][0], w = mel[m2][1], acc = 0; for (var j = 0; j < w.length; j++) acc += w[j] * pw[s0 + j]; col[m2] = Math.log10(Math.max(acc, 1e-10)); }
+      }
+      for (var m3 = 0; m3 < nmel; m3++) { var v = col[m3]; out[m3 * NFR + t] = v; if (v > mx) mx = v; }
+    }
+    var lo = mx - 8; for (var q = 0; q < out.length; q++) { var u = out[q] < lo ? lo : out[q]; out[q] = (u + 4) / 4; }
+    return out;
+  }
+  // ---------- model loading (parts -> one buffer; Cache API keeps them for offline) ----------
+  async function getBuf(base, man, name, onp, done, total) {
+    var c = null; try { c = await caches.open("kol-listen-model-" + man.version); } catch (e) {}
+    var f = man.files[name], bufs = [];
+    for (var i = 0; i < f.parts.length; i++) {
+      var url = base + f.parts[i], r = c ? await c.match(url) : null;
+      if (!r) { r = await FETCH(url); if (!r.ok) throw new Error("model file " + f.parts[i] + " " + r.status); if (c) await c.put(url, r.clone()); }
+      var b = new Uint8Array(await r.arrayBuffer()); bufs.push(b); done.n += b.length; if (onp) onp(done.n / total);
+    }
+    var all = new Uint8Array(f.bytes), o = 0; for (var j = 0; j < bufs.length; j++) { all.set(bufs[j], o); o += bufs[j].length; }
+    return all;
+  }
+  // ORT's engine (.wasm, ~10 MB) is published in <= 880 KB parts (the site publisher refuses bigger files); fetched once, cached,
+  // joined into one in-memory file (Blob URL). Only the build this device needs is fetched. (Same scheme as /pocket/.)
+  var SIMD = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]);
+  async function cachedBytes(url) {
+    var c = null; try { c = await caches.open("kol-listen-engine"); } catch (e) {}
+    var r = c ? await c.match(url) : null;
+    if (!r) { r = await FETCH(url); if (!r.ok) throw new Error(url + " " + r.status); if (c) await c.put(url, r.clone()); }
+    return new Uint8Array(await r.arrayBuffer());
+  }
+  async function wasmPaths(dir, threads) {
+    var wm; try { wm = await (await FETCH(dir + "wasm-manifest.json", { cache: "no-cache" })).json(); try { localStorage.setItem("kol-listen-wm", JSON.stringify(wm)); } catch (e) {} }
+    catch (e) { wm = JSON.parse(localStorage.getItem("kol-listen-wm") || "null"); if (!wm) return dir; }
+    var simd = false; try { simd = WebAssembly.validate(SIMD); } catch (e) {}
+    var name = "ort-wasm" + (simd ? "-simd" : "") + (threads ? "-threaded" : "") + ".wasm", f = wm.files[name];
+    if (!f) return dir;
+    var bufs = []; for (var i = 0; i < f.parts.length; i++) bufs.push(await cachedBytes(dir + f.parts[i] + "?v=" + f.sha.slice(0, 10)));
+    var url = URL.createObjectURL(new Blob(bufs, { type: "application/wasm" })), out = {};
+    ["ort-wasm.wasm", "ort-wasm-simd.wasm", "ort-wasm-threaded.wasm", "ort-wasm-simd-threaded.wasm"].forEach(function (k) { out[k] = url; });
+    return out;
+  }
+  async function getJson(base, man, name) {
+    var c = null; try { c = await caches.open("kol-listen-model-" + man.version); } catch (e) {}
+    var url = base + name + "?v=" + man.version, r = c ? await c.match(url) : null;
+    if (!r) { r = await FETCH(url); if (!r.ok) throw new Error(name + " " + r.status); if (c) await c.put(url, r.clone()); }
+    return r.json();
+  }
+  async function load(base, onp) {
+    if (S.ready) return S;
+    var man;
+    try { man = await (await FETCH(base + "manifest.json", { cache: "no-cache" })).json(); try { localStorage.setItem("kol-listen-man", JSON.stringify(man)); } catch (e) {} }
+    catch (e) { man = JSON.parse(localStorage.getItem("kol-listen-man") || "null"); if (!man) throw e; }
+    var total = 0; for (var k in man.files) total += man.files[k].bytes; var done = { n: 0 };
+    var ort = ORT(), threads = (G.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 2) : 1);
+    ort.env.wasm.numThreads = threads;
+    ort.env.wasm.wasmPaths = (S.wasmPaths) || await wasmPaths(man.ort || (base + "../ort/"), threads > 1);
+    var opt = { executionProviders: ["wasm"], graphOptimizationLevel: "all" };
+    var eb = await getBuf(base, man, "encoder", onp, done, total);
+    S.enc = await ort.InferenceSession.create(eb, opt); eb = null;
+    var db = await getBuf(base, man, "decoder", onp, done, total);
+    S.dec = await ort.InferenceSession.create(db, opt); db = null;
+    S.mel = await getJson(base, man, "mel80.json");
+    var vt = await getJson(base, man, "vocab.json");
+    S.vocab = vt.tokens; S.special = vt.special; S.cfg = man.config; S.man = man;
+    // GPT-2 byte decoder
+    var bs = [], cs = []; for (var i = 33; i <= 126; i++) bs.push(i); for (i = 161; i <= 172; i++) bs.push(i); for (i = 174; i <= 255; i++) bs.push(i);
+    cs = bs.slice(); var n = 0; for (var b = 0; b < 256; b++) if (bs.indexOf(b) < 0) { bs.push(b); cs.push(256 + n); n++; }
+    S.bdec = {}; for (i = 0; i < bs.length; i++) S.bdec[String.fromCharCode(cs[i])] = bs[i];
+    S.ready = true; return S;
+  }
+  function decodeTokens(ids) {
+    var bytes = [];
+    for (var i = 0; i < ids.length; i++) {
+      if (ids[i] >= S.cfg.eot) continue; var t = S.vocab[ids[i]]; if (t == null) continue;
+      for (var j = 0; j < t.length; j++) { var b = S.bdec[t[j]]; if (b != null) bytes.push(b); }
+    }
+    return new TextDecoder("utf-8").decode(new Uint8Array(bytes)).trim();
+  }
+  // ---------- greedy decoding with KV cache (optimum "decoder_model_merged") ----------
+  async function decodeOne(feats) {
+    var ort = ORT(), c = S.cfg;
+    var eo = await S.enc.run({ input_features: new ort.Tensor("float32", feats, [1, c.n_mels, NFR]) });
+    var hs = eo.last_hidden_state;
+    var prefix = [c.sot, c.lang, c.transcribe, c.notimestamps], toks = prefix.slice(), out = [];
+    var past = {}, L = c.dec_layers, H = c.heads, D = c.head_dim;
+    for (var l = 0; l < L; l++) for (var kind of ["decoder", "encoder"]) for (var kv of ["key", "value"])
+      past["past_key_values." + l + "." + kind + "." + kv] = new ort.Tensor("float32", new Float32Array(0), [1, H, 0, D]);
+    var supp = new Set(c.suppress || []), maxNew = c.max_new || 224, ids = toks;
+    for (var step = 0; step < maxNew; step++) {
+      var feeds = Object.assign({ input_ids: new ort.Tensor("int64", BigInt64Array.from(ids.map(BigInt)), [1, ids.length]),
+        encoder_hidden_states: hs, use_cache_branch: new ort.Tensor("bool", [step > 0], [1]) }, past);
+      var r = await S.dec.run(feeds), lg = r.logits.data, V = r.logits.dims[2], off = (r.logits.dims[1] - 1) * V;
+      var best = -1, bv = -Infinity;
+      for (var v = 0; v < V; v++) { if (supp.has(v) || v > c.eot || (step === 0 && (v === c.eot || v === 220))) continue; var x = lg[off + v]; if (x > bv) { bv = x; best = v; } }
+      for (var key in r) if (key.indexOf("present.") === 0) {
+        var pk = "past_key_values." + key.slice(8);
+        if (step === 0 || key.indexOf(".decoder.") > 0) past[pk] = r[key];
+      }
+      if (best === c.eot) break;
+      out.push(best); ids = [best];
+      if (out.length >= 6) { // stop endless loops: the last p tokens repeated 3 times in a row (p = 1..30)
+        var n = out.length, cut = 0;
+        for (var p = 1; p <= 30 && 3 * p <= n && !cut; p++) {
+          var same = true; for (var q = 0; q < p && same; q++) { var t0 = out[n - 1 - q]; if (out[n - 1 - q - p] !== t0 || out[n - 1 - q - 2 * p] !== t0) same = false; }
+          if (same && (p > 1 || out[n - 1] !== 220)) cut = p;
+        }
+        if (cut) { out = out.slice(0, n - 2 * cut); break; }
+      }
+    }
+    return out;
+  }
+  // ---------- split long audio on quiet spots (<= 28 s pieces) ----------
+  function splitAudio(x) {
+    var MAX = 28 * SR, pieces = [], s = 0;
+    while (x.length - s > MAX) {
+      var win = 400, best = s + MAX, bestE = Infinity;
+      for (var p = s + 12 * SR; p + win < s + MAX; p += 160) { var e = 0; for (var i = p; i < p + win; i++) e += x[i] * x[i]; if (e < bestE) { bestE = e; best = p + win / 2; } }
+      pieces.push(x.subarray(s, best)); s = best;
+    }
+    if (x.length - s > 0.3 * SR) pieces.push(x.subarray(s));
+    return pieces;
+  }
+  // ---------- quiet parts: trim silence at both ends and skip pieces with no speech (Whisper invents words in silence) ----------
+  var FR = 320; // 20 ms frames
+  function frameDb(x) { var n = Math.floor(x.length / FR), d = new Float32Array(n);
+    for (var f = 0; f < n; f++) { var e = 0; for (var i = f * FR; i < (f + 1) * FR; i++) e += x[i] * x[i]; d[f] = 10 * Math.log10(e / FR + 1e-10); } return d; }
+  function speechThr(d) { var s = Array.from(d).sort(function (a, b) { return a - b; }); var p95 = s[Math.floor(s.length * 0.95)] || -100; return Math.max(-55, p95 - 32); }
+  function trimQuiet(x) { var d = frameDb(x); if (!d.length) return x; var thr = speechThr(d), a = 0, b = d.length - 1;
+    while (a < d.length && d[a] < thr) a++; while (b > a && d[b] < thr) b--; if (a >= d.length) return x.subarray(0, 0);
+    var s = Math.max(0, (a - 15) * FR), e = Math.min(x.length, (b + 1 + 25) * FR); return x.subarray(s, e); }
+  function hasSpeech(p, thr) { var d = frameDb(p), on = 0; for (var i = 0; i < d.length; i++) if (d[i] >= thr) on++; return on >= 10 && on / Math.max(1, d.length) > 0.03; }
+  async function transcribe(x, onPiece) {
+    var t0 = performance.now(), full = x, thrAll = speechThr(frameDb(x)); x = trimQuiet(x);
+    var parts = splitAudio(x).filter(function (p) { return hasSpeech(p, thrAll); }), texts = [], melMs = 0;
+    for (var i = 0; i < parts.length; i++) {
+      var t1 = performance.now(), f = logMel(parts[i], S.mel); melMs += performance.now() - t1;
+      var ids = await decodeOne(f); var t = decodeTokens(ids); texts.push(t); if (onPiece) onPiece(texts.join(" "), i + 1, parts.length);
+    }
+    return { text: texts.join(" ").replace(/\s+/g, " ").trim(), ms: Math.round(performance.now() - t0), mel_ms: Math.round(melMs), pieces: parts.length, audio_s: full.length / SR };
+  }
+  G.KolListen = { load: load, transcribe: transcribe, logMel: logMel, state: S };
+})(typeof window !== "undefined" ? window : globalThis);
+
+;if(typeof KolListen==='undefined'&&self.KolListen){var KolListen=self.KolListen;}
+/* Kol userscript, host side: the voice runs inside this page (on this phone). The voice, engine and reading list are
+   downloaded once from Jacob's site and kept on the phone (IndexedDB), so it works offline afterwards.
+   Report / Record entries wait on the phone and are sent to his site when online. */
+(function () {
+  "use strict";
+  var SITE = "https://kol-status-q7m4x2.sites.tab.bot/", VERSION = "1.1.0", US_SOURCE = null;
+  var GMX = (typeof GM_xmlhttpRequest === "function") ? GM_xmlhttpRequest : (typeof GM !== "undefined" && GM && typeof GM.xmlHttpRequest === "function") ? GM.xmlHttpRequest : null;
+  var GMNAME = (typeof GM_xmlhttpRequest === "function") ? "GM_xmlhttpRequest" : GMX ? "GM.xmlHttpRequest" : "none";
+  var HANDLER = (function () { try { var i = (typeof GM_info !== "undefined" && GM_info) || (typeof GM !== "undefined" && GM && GM.info) || null; return i ? (i.scriptHandler || "?") + " " + (i.version || "") : "unknown"; } catch (e) { return "unknown"; } })();
+  var NET = { how: "", fetchErr: "", gmErr: "" };     // which way downloads worked (fetch from his site = CORS, or the script manager's request)
+  function viaFetch(url, type, headers, method, data) {
+    return fetch(url, { method: method || "GET", body: data, headers: headers, mode: "cors", credentials: "omit", cache: "no-store" }).then(function (r) {
+      if (!r.ok) { if (method) return r.text().then(function (t) { try { return JSON.parse(t); } catch (e) { throw new Error("HTTP " + r.status); } }); throw new Error("HTTP " + r.status); }
+      return type === "json" ? r.json() : type === "text" ? r.text() : r.arrayBuffer();
+    });
+  }
+  function viaGM(url, type, headers, method, data) {
+    return new Promise(function (res, rej) {
+      if (!GMX) return rej(new Error("no GM request API"));
+      var bin = !(type === "json" || type === "text"), done = false;
+      function ok(v) { if (!done) { done = true; res(v); } } function bad(e) { if (!done) { done = true; rej(e); } }
+      function body(r) {
+        if (!bin) return r.responseText != null ? r.responseText : (typeof r.response === "string" ? r.response : "");
+        var x = r.response;
+        if (x instanceof ArrayBuffer) return x;
+        if (x && x.buffer instanceof ArrayBuffer && x.byteLength != null) return x.buffer.slice(x.byteOffset, x.byteOffset + x.byteLength);
+        if (x && typeof x.arrayBuffer === "function") return x.arrayBuffer();
+        if (x && Object.prototype.toString.call(x) === "[object ArrayBuffer]") return x;    // ArrayBuffer from another JS world
+        throw new Error("script manager gave no binary data (" + (x === null ? "null" : typeof x) + ")");
+      }
+      try {
+        var q = GMX({ method: method || "GET", url: url, responseType: bin ? "arraybuffer" : "text", headers: headers || {}, data: data, timeout: 120000,
+          onload: function (r) {
+            try {
+              if (r.status < 200 || r.status >= 300) { if (method) { try { return ok(JSON.parse(r.responseText)); } catch (e) {} } return bad(new Error("HTTP " + r.status)); }
+              Promise.resolve(body(r)).then(function (b) { if (type === "json") { try { ok(JSON.parse(b)); } catch (e) { bad(e); } } else if (bin && Object.prototype.toString.call(b) === "[object ArrayBuffer]" && !(b instanceof ArrayBuffer)) ok(new Uint8Array(b).slice().buffer); else ok(b); }, bad);
+            } catch (e) { bad(e); }
+          },
+          onerror: function (r) { bad(new Error("request failed" + (r && r.error ? ": " + r.error : "") + (r && r.status ? " (HTTP " + r.status + ")" : ""))); },
+          ontimeout: function () { bad(new Error("timeout")); } });
+        if (q && typeof q.then === "function") q.then(function (r) { if (r && r.status != null && !done) { try { if (r.status >= 200 && r.status < 300) Promise.resolve(body(r)).then(function (b) { ok(type === "json" ? JSON.parse(b) : b); }, bad); } catch (e) { bad(e); } } }, function (e) { bad(e instanceof Error ? e : new Error(String(e && e.error || e))); });
+      } catch (e) { bad(e); }
+    });
+  }
+  // fetch first (his site allows ivelt.com — no script-manager plumbing for 41 MB); the manager's request if fetch is blocked
+  function get(url, type, headers, method, data) {
+    var order = NET.how === "gm" ? [viaGM, viaFetch] : [viaFetch, viaGM];
+    return order[0](url, type, headers, method, data).then(function (v) { NET.how = order[0] === viaFetch ? "fetch" : "gm"; return v; }, function (e1) {
+      if (order[0] === viaFetch) NET.fetchErr = String(e1 && e1.message || e1); else NET.gmErr = String(e1 && e1.message || e1);
+      if (/^HTTP [45]/.test(String(e1 && e1.message))) throw e1;
+      return order[1](url, type, headers, method, data).then(function (v) { NET.how = order[1] === viaFetch ? "fetch" : "gm"; return v; }, function (e2) {
+        if (order[1] === viaFetch) NET.fetchErr = String(e2 && e2.message || e2); else NET.gmErr = String(e2 && e2.message || e2);
+        throw new Error("download failed — fetch: " + (NET.fetchErr || "?") + " / " + GMNAME + ": " + (NET.gmErr || "?"));
+      });
+    });
+  }
+  // ---------- storage on this phone ----------
+  // Files go into IndexedDB as plain ArrayBuffers (Cache Storage is the fallback), and also stay in memory for this page so a
+  // failed save never stops playing. Never read big data back through a Blob: Safari can fail with "The I/O read operation failed".
+  var MEM = {}, STORE = { how: "", err: "" }, CK = location.origin + "/__kol_files__/";
+  var dbp = null;
+  function db() { if (!dbp) { dbp = new Promise(function (res, rej) { var r = indexedDB.open("kol-ivelt", 1); r.onupgradeneeded = function () { r.result.createObjectStore("files"); r.result.createObjectStore("q", { keyPath: "uid" }); }; r.onsuccess = function () { res(r.result); }; r.onerror = function () { rej(r.error); }; }); dbp.catch(function () { dbp = null; }); } return dbp; }
+  function idb(store, mode, fn) { return db().then(function (d) { return new Promise(function (res, rej) { var t = d.transaction(store, mode), s = t.objectStore(store), q = fn(s); t.oncomplete = function () { res(q && q.result); }; t.onerror = function () { rej(t.error); }; t.onabort = function () { rej(t.error); }; }); }); }
+  var cachep = null;
+  function cache() { if (!cachep) { cachep = (typeof caches !== "undefined" && caches) ? caches.open("kol-ivelt-files") : Promise.reject(new Error("no Cache Storage")); cachep.catch(function () {}); } return cachep; }
+  function ckey(k) { return CK + encodeURIComponent(k); }
+  async function fget(k) {
+    if (MEM[k] != null) return MEM[k];
+    var isText = /^(text:|voice$)/.test(k), v;
+    try { v = await idb("files", "readonly", function (s) { return s.get(k); }); } catch (e) { STORE.err = "idb read: " + (e && e.message || e); v = undefined; }
+    if (v == null) { try { var c = await cache(), r = await c.match(ckey(k)); if (r) { v = isText ? await r.text() : await r.arrayBuffer(); if (k === "voice") v = JSON.parse(v); } } catch (e) { STORE.err = "cache read: " + (e && e.message || e); } }
+    if (v != null && !isText && k !== "voice") MEM[k] = v;
+    return v == null ? undefined : v;
+  }
+  async function fput(k, v) {
+    MEM[k] = v;
+    try { await idb("files", "readwrite", function (s) { return s.put(v, k); }); STORE.how = "idb"; return; } catch (e) { STORE.err = "idb write: " + (e && e.message || e); }
+    try { var c = await cache(); await c.put(ckey(k), new Response(k === "voice" ? JSON.stringify(v) : v)); STORE.how = "cache"; return; } catch (e) { STORE.err = "cache write: " + (e && e.message || e); }
+    STORE.how = "memory only";       // only for this page (downloaded again next time)
+  }
+  async function fdel(k) { delete MEM[k]; try { var c = await cache(); await c.delete(ckey(k)); } catch (e) {} try { await idb("files", "readwrite", function (s) { return s.delete(k); }); } catch (e) {} }
+  // ---------- the voice: download once, keep, notice a newer one on the site ----------
+  var latest = null, lastCheck = 0;
+  async function siteManifest() { try { latest = await get(SITE + "pocket/model/manifest.json?r=" + Date.now(), "json"); lastCheck = Date.now(); } catch (e) {} return latest; }
+  async function downloadVoice(m, onp) {
+    var got = 0;
+    for (var i = 0; i < m.parts.length; i++) {
+      var k = "v:" + m.sha.slice(0, 16) + ":" + i, have = await fget(k);
+      if (!have) { have = await get(SITE + "pocket/model/" + m.parts[i] + "?v=" + m.sha.slice(0, 10), "bin"); await fput(k, have); }
+      got += have.byteLength; onp && onp(got, m.bytes);
+    }
+    var td = await get(SITE + "pocket/pocket-text-data.json?v=" + m.text_version, "text"); await fput("text:" + m.text_version, td);
+    var old = await fget("voice");
+    await fput("voice", m);
+    if (old && old.sha !== m.sha) for (var j = 0; j < old.parts.length; j++) await fdel("v:" + old.sha.slice(0, 16) + ":" + j);
+  }
+  var cur = null;
+  var SIMD = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11]);
+  KolEngine.setSource(US_SOURCE = {
+    noThreads: true,
+    manifest: async function () {
+      cur = await fget("voice");
+      if (!cur) { var m = await siteManifest(); if (!m) throw new Error("first time needs internet (to download the voice once)"); await downloadVoice(m, progress); cur = m; }
+      else if (Date.now() - lastCheck > 6 * 3600e3) siteManifest();
+      return cur;
+    },
+    textData: async function (ver) { var t = await fget("text:" + ver); if (!t) { try { t = await get(SITE + "pocket/pocket-text-data.json?v=" + ver, "text"); await fput("text:" + ver, t); } catch (e) { t = null; } } return t ? JSON.parse(t) : KOL_TEXT_DATA; },
+    model: async function (onp) {
+      var out = new Uint8Array(cur.bytes), o = 0, k0 = "v:" + cur.sha.slice(0, 16) + ":";
+      for (var i = 0; i < cur.parts.length; i++) {
+        var b = await fget(k0 + i);
+        if (!b) { await downloadVoice(cur, progress); b = await fget(k0 + i); }
+        if (!b || !b.byteLength) throw new Error("voice part " + i + " missing after download (storage: " + (STORE.err || STORE.how) + ")");
+        if (o + b.byteLength > out.length) { await clearVoice(cur); throw new Error("voice parts don't add up (part " + i + "); cleared, tap ▶ again"); }
+        out.set(new Uint8Array(b), o); o += b.byteLength; onp && onp(o, cur.bytes);
+      }
+      if (o !== cur.bytes) { await clearVoice(cur); throw new Error("voice is " + o + " of " + cur.bytes + " bytes; cleared, tap ▶ again"); }
+      return out;
+    },
+    wasmPaths: async function () {
+      var simd = false; try { simd = WebAssembly.validate(SIMD); } catch (e) {}
+      var name = simd ? "ort-wasm-simd.wasm" : "ort-wasm.wasm", key = "wasm:" + name, w = await fget(key);
+      ENG.wasm = name;
+      if (!w) {
+        var wm = await get(SITE + "pocket/ort/wasm-manifest.json?r=" + Date.now(), "json"), f = wm.files[name], bufs = [], got = 0;
+        if (!f) throw new Error("engine file " + name + " is not on the site");
+        for (var i = 0; i < f.parts.length; i++) { var b = await get(SITE + "pocket/ort/" + f.parts[i] + "?v=" + f.sha.slice(0, 10), "bin"); bufs.push(new Uint8Array(b)); got += b.byteLength; progress(got, f.bytes, "engine"); }
+        if (got !== f.bytes) throw new Error("engine download incomplete (" + got + " of " + f.bytes + ")");
+        w = concat(bufs).buffer; await fput(key, w);
+      }
+      // a data: address — the engine reads it straight from memory (no fetch of a blob: address, which page rules or Safari can block)
+      var url = ENG.mode === "blob" ? URL.createObjectURL(new Blob([w], { type: "application/wasm" })) : dataUrl(w);
+      ENG.wasmBytes = w.byteLength;
+      return { "ort-wasm.wasm": url, "ort-wasm-simd.wasm": url, "ort-wasm-threaded.wasm": url, "ort-wasm-simd-threaded.wasm": url };
+    }
+  });
+  var ENG = { mode: (localStorage.getItem("kol-ivelt-wasm-mode") || "data") };
+  function concat(bufs) { var n = 0, i, o = 0; for (i = 0; i < bufs.length; i++) n += bufs[i].byteLength; var out = new Uint8Array(n); for (i = 0; i < bufs.length; i++) { var b = bufs[i] instanceof Uint8Array ? bufs[i] : new Uint8Array(bufs[i]); out.set(b, o); o += b.byteLength; } return out; }
+  function dataUrl(buf) {          // built by hand: reading a big Blob back fails on some Safaris ("The I/O read operation failed")
+    var u = new Uint8Array(buf), parts = [], CH = 0x8000 * 3;
+    for (var i = 0; i < u.length; i += CH) { var s = "", sub = u.subarray(i, Math.min(u.length, i + CH)); for (var j = 0; j < sub.length; j += 0x8000) s += String.fromCharCode.apply(null, sub.subarray(j, j + 0x8000)); parts.push(btoa(s)); }
+    return "data:application/octet-stream;base64," + parts.join("");
+  }
+  async function clearVoice(m) { for (var j = 0; j < m.parts.length; j++) await fdel("v:" + m.sha.slice(0, 16) + ":" + j); await fdel("voice"); cur = null; }
+  var listeners = [];
+  function progress(got, total, what) { var pct = Math.round(100 * got / total); listeners.forEach(function (f) { f({ type: "status", text: (what === "engine" ? "Downloading the engine " : "Downloading the voice ") + pct + "% (first time only)", pct: pct }); }); }
+  KolEngine.on(function (e) { listeners.forEach(function (f) { try { f(e); } catch (x) {} }); });
+  // ---------- queue ----------
+  function qAll() { return idb("q", "readonly", function (s) { return s.getAll(); }); }
+  function multipart(meta, blob) {
+    var bd = "----kol" + Math.random().toString(36).slice(2), ext = /mp4|m4a|aac/.test(blob.type) ? "m4a" : "webm";
+    var head = "--" + bd + "\r\nContent-Disposition: form-data; name=\"meta\"\r\nContent-Type: application/json; charset=utf-8\r\n\r\n" + JSON.stringify(meta) +
+      "\r\n--" + bd + "\r\nContent-Disposition: form-data; name=\"audio\"; filename=\"take." + ext + "\"\r\nContent-Type: " + (blob.type || "audio/mp4") + "\r\n\r\n";
+    return { type: "multipart/form-data; boundary=" + bd, body: new Blob([new TextEncoder().encode(head), blob, "\r\n--" + bd + "--\r\n"]) };
+  }
+  var flushing = null;
+  function flush() { if (!flushing) flushing = doFlush().finally(function () { flushing = null; }); return flushing; }
+  async function doFlush() {
+    var items = await qAll(), sent = 0, err = ""; items.sort(function (a, b) { return a.created - b.created; });
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i], j;
+      try {
+        if (it.kind === "report") j = await get(SITE + "api/afb/submit", "json", { "content-type": "application/json" }, "POST", JSON.stringify({ source: "ivelt", test: !!it.data.test, uid: it.uid, items: [Object.assign({ action: "ivelt_report" }, it.data)] }));
+        else { var mp = multipart(Object.assign({ uid: "ivelt-" + it.uid, abbr: "ivelt", target: "ivelt", source: "ivelt", training_use: "pronunciation_fixes_only" }, it.data), it.b64 ? new Blob([Uint8Array.from(atob(it.b64), function (ch) { return ch.charCodeAt(0); })], { type: it.mime || "audio/mp4" }) : (it.blob || new Blob([it.audio], { type: it.mime || "audio/mp4" })));
+          j = await get(SITE + "api/arec/submit", "json", { "content-type": mp.type }, "POST", GMX ? await mp.body.arrayBuffer() : mp.body); }
+        if (j && j.ok) { await idb("q", "readwrite", function (s) { return s.delete(it.uid); }); sent++; LS("sent", (+LS("sent") || 0) + 1); }
+        else err = "site said " + (j && j.error || "no");
+      } catch (e) { err = String(e.message || e); break; }
+    }
+    LS("err", err); return { sent: sent, error: err };
+  }
+  function LS(k, v) { var key = "kol-ivelt-q-" + k; if (v === undefined) return localStorage.getItem(key); localStorage.setItem(key, v); }
+  window.KolHost = {
+    kind: "userscript", version: VERSION,
+    stt: async function (pcm) {     // 🎙 talk-to-text (1.1.0): the /listen/ model, downloaded once through the script's own request (the site sends no CORS headers)
+      window.KolListenFetch = function (u) { return get(u, "bin").then(function (b) { return new Response(b); }); };
+      if (!KolListen.state.wasmPaths) KolListen.state.wasmPaths = await US_SOURCE.wasmPaths(false);
+      await KolListen.load(SITE + "listen/model/");
+      var r = await KolListen.transcribe(pcm); return { text: r.text, ms: r.ms };
+    },
+    play: function (o) { KolEngine.play(o); }, pause: KolEngine.pause, resume: KolEngine.resume, stop: KolEngine.stop, unlock: KolEngine.unlock,
+    on: function (f) { listeners.push(f); },
+    enqueue: async function (e) {
+      var item = { kind: e.kind, uid: e.uid, data: e.data, created: Date.now() };
+      if (e.blob) { item.b64 = await new Promise(function (res, rej) { var fr = new FileReader(); fr.onload = function () { var u = String(fr.result); res(u.slice(u.indexOf(",") + 1)); }; fr.onerror = function () { rej(fr.error); }; fr.readAsDataURL(e.blob); }); item.mime = e.blob.type; }   // text, not a blob: Safari can't always read blobs back
+      await idb("q", "readwrite", function (s) { return s.put(item); });
+      var r = await flush().catch(function () { return {}; }), left = await qAll();
+      return { queued: true, sent: !left.some(function (x) { return x.uid === e.uid; }), flush: r };
+    },
+    queueStatus: async function () { var n = (await qAll()).length; return { waiting: n, sent: +LS("sent") || 0, error: n ? LS("err") || "" : "" }; },
+    flush: flush,
+    info: async function () {
+      var v = await fget("voice"), i = KolEngine.info(), r = { voice: v ? { sha: v.sha, built: v.built, step: v.config && v.config.step, label: "pocket" } : { label: "not downloaded yet" }, threads: i.threads };
+      if (latest && v && latest.sha !== v.sha) r.voiceUpdate = { mb: Math.round(latest.bytes / 1048576) };
+      try { var meta = await get(SITE + "ext/version.json?r=" + Date.now(), "json"); r.latestVersion = meta.userscript_version;
+        if (newer(meta.userscript_version, VERSION)) { r.appUpdateUrl = SITE + "ext/kol-ivelt.user.js"; r.update = "A new version (" + meta.userscript_version + ") is on your site."; } else r.update = "Up to date."; }
+      catch (e) { r.update = "Offline: could not check for updates."; }
+      return r;
+    },
+    checkUpdates: function () { return siteManifest(); },
+    voiceUpdate: async function () { var m = await siteManifest(); if (!m) return { ok: false, error: "offline" }; try { await downloadVoice(m, progress); KolEngine.reset(); return { ok: true, text: "new voice ready" }; } catch (e) { return { ok: false, error: e.message }; } },
+    voiceTag: function () { return cur ? cur.sha.slice(0, 8) : ""; },
+    setOut: function (m) { KolEngine.setOut(m); }, getOut: function () { return KolEngine.getOut(); },
+    diag: function () {
+      var u = KolEngine.unlockInfo ? KolEngine.unlockInfo() : {}, i = KolEngine.info();
+      return "Kol iPhone script " + VERSION + " · " + HANDLER + " · request: " + GMNAME + " · net: " + (NET.how || "-") + (NET.fetchErr ? " (fetch: " + NET.fetchErr + ")" : "") + (NET.gmErr ? " (gm: " + NET.gmErr + ")" : "") +
+        " · store: " + (STORE.how || "-") + (STORE.err ? " (" + STORE.err + ")" : "") + " · engine: " + (ENG.wasm || "-") + " " + ENG.mode + " · stage: " + (KolEngine.loadStage ? KolEngine.loadStage() : "") +
+        " · audio: session " + (u.session || "-") + ", keep " + (u.element || "-") + ", ctx " + (u.ctx || "-") + ", out " + KolEngine.getOut() + " · loaded " + i.loaded + " · " + navigator.userAgent;
+    },
+    selfTest: async function (line) {
+      KolEngine.unlock();                       // this runs inside the tap on 🔧
+      var ok = true;
+      async function stage(name, fn) {
+        line("⏳ " + name + "…", name);
+        var t0 = Date.now();
+        try { var r = await fn(); line("✅ " + name + (r ? " — " + r : "") + " (" + ((Date.now() - t0) / 1000).toFixed(1) + " s)", name); return true; }
+        catch (e) { ok = false; line("❌ " + name + " — " + (e && e.message || e) + (e && e.kolStage ? " [" + e.kolStage + "]" : ""), name); return false; }
+      }
+      await stage("1. Reach your site", async function () { var m = await siteManifest(); if (!m) throw new Error("no answer: fetch " + (NET.fetchErr || "?") + " / " + GMNAME + " " + (NET.gmErr || "?")); return "via " + NET.how + ", voice " + (m.bytes / 1048576).toFixed(0) + " MB"; });
+      await stage("2. Voice saved on phone", async function () {
+        var m = await fget("voice"); if (!m) { m = latest; if (!m) throw new Error("not downloaded and site unreachable"); await downloadVoice(m, function (g, t) { line("⏳ 2. downloading " + Math.round(100 * g / t) + "%", "2. Voice saved on phone"); }); cur = m; }
+        var bufs = [], tot = 0; for (var i = 0; i < m.parts.length; i++) { var b = await fget("v:" + m.sha.slice(0, 16) + ":" + i); if (!b) throw new Error("part " + i + " of " + m.parts.length + " missing (" + (STORE.err || STORE.how) + ")"); bufs.push(b); tot += b.byteLength; }
+        if (tot !== m.bytes) throw new Error(tot + " of " + m.bytes + " bytes");
+        var h = "";
+        try { var d = new Uint8Array(await crypto.subtle.digest("SHA-256", concat(bufs))); for (var j = 0; j < d.length; j++) h += (d[j] < 16 ? "0" : "") + d[j].toString(16); } catch (e) { h = "?"; STORE.shaErr = String(e && e.message || e); }
+        if (h !== "?" && h !== m.sha) { await clearVoice(m); throw new Error("voice file damaged (checksum); cleared — run the test again to re-download"); }
+        return (tot / 1048576).toFixed(1) + " MB, checksum " + (h === "?" ? "not checked" : "OK") + ", kept in " + (STORE.how || "storage");
+      });
+      await stage("3. Start the engine", async function () { await KolEngine.load(); var L = window.KOL_ENGINE_LOAD || {}; return (ENG.wasm || "") + " (" + ENG.mode + "), " + (L.ms ? (L.ms / 1000).toFixed(1) + " s" : "already running"); });
+      var word = null;
+      await stage("4. Make one word", async function () { var r = await KolEngine.testSynth("שלום עליכם."); word = r; if (!r.samples) throw new Error("no audio made"); var s = r.stats || {}; if (s.nan) throw new Error(s.nan + " broken (NaN) samples of " + s.n); if (!(s.peak > 1e-4)) throw new Error("audio is silent (peak " + s.peak + ")"); return r.sec + " s of sound in " + (r.ms / 1000).toFixed(1) + " s, level " + s.peak; });
+      await stage("5. Play a beep", async function () { var r = await KolEngine.testPlay(null); if (r.state !== "running" || !(r.clock_moved > 0.2)) throw new Error("sound is blocked (audio " + r.state + ", clock moved " + r.clock_moved + " s)"); return "audio " + r.state + ", session " + r.session + ", path " + r.out; });
+      if (word && word.wave) await stage("6. Play the word", async function () { var r = await KolEngine.testPlay(word.wave, word.sr); if (r.state !== "running" || !(r.clock_moved > 0.2)) throw new Error("sound is blocked (" + r.state + ")"); return "played " + r.length + " s"; });
+      line((ok ? "🟢 All steps passed. Did you HEAR the beep and \"שלום עליכם\"? If not: phone volume up, or switch \"sound path\" below and test again." : "🔴 A step failed — tap 📋 and send it to Tab.") + " DONE", "end");
+      return ok;
+    }
+  };
+  function newer(a, b) { a = String(a || "0").split(".").map(Number); b = String(b || "0").split(".").map(Number); for (var i = 0; i < 3; i++) { if ((a[i] || 0) > (b[i] || 0)) return true; if ((a[i] || 0) < (b[i] || 0)) return false; } return false; }
+})();
+
+
+/* Kol for ivelt.com: 🎙 talk-to-text in the post box (1.1.0), ▶ per post, ⏸/⏹, ⚠️ Report wrong words, 🎤 Record how it's said, ▶ Play all unread, speed, settings.
+   Shared by the Chrome extension and the iPhone userscript; KolHost (set by each) does the speaking and the sending.
+   Speech is made on this device. Reports and recordings wait on this device and are sent to Jacob's own site
+   (kol-status) — recordings are ONLY for fixing pronunciation / the word list, never for training the voice. */
+(function () {
+  "use strict";
+  if (window.__kolIveltReading) return; window.__kolIveltReading = true;
+  var H = window.KolHost; if (!H) return;
+  var LS = window.localStorage, SETK = "kol-ivelt-settings", PLAYK = "kol-ivelt-playall", HEARDK = "kol-ivelt-heard";
+  function getS() { var d = { speed: 1, quotes: false, names: true, stt: true }; try { return Object.assign(d, JSON.parse(LS.getItem(SETK) || "{}")); } catch (e) { return d; } }
+  function setS(k, v) { var s = getS(); s[k] = v; LS.setItem(SETK, JSON.stringify(s)); try { document.dispatchEvent(new Event("kol-settings")); } catch (e) {} return s; }
+  function isTest() { return LS.getItem("kol-test") === "1" || /[?&]koltest=1/.test(location.search); }
+  function el(tag, cls, txt, attrs) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  function btn(txt, cls, fn, title) { var b = el("button", "kol-b " + (cls || ""), txt, { type: "button" }); if (title) { b.title = title; b.setAttribute("aria-label", title); } b.addEventListener("click", function (ev) { ev.preventDefault(); ev.stopPropagation(); fn(ev); }); return b; }
+  function toast(t, ms) { var x = el("div", "kol-toast", t); document.body.appendChild(x); setTimeout(function () { x.remove(); }, ms || 2600); }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  // ---------- reading a post ----------
+  var BLOCK = /^(P|DIV|LI|UL|OL|H\d|BLOCKQUOTE|TR|TABLE|DD|DT|DL|PRE)$/;
+  function flat(node, out) {
+    for (var c = node.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 3) out.push(c.nodeValue);
+      else if (c.nodeType === 1) {
+        if (c.tagName === "BR") { out.push("\n"); continue; }
+        if (c.tagName === "A" && /^(https?:|www\.)/i.test((c.textContent || "").trim())) { out.push(" לינק "); continue; }
+        flat(c, out); if (BLOCK.test(c.tagName)) out.push("\n");
+      }
+    }
+    return out;
+  }
+  function quoteWho(q) { var c = q.querySelector("cite"); if (!c) return ""; var a = c.querySelector("a,strong"); var t = (a ? a.textContent : c.textContent).replace(/(wrote|האט געשריבן|כתב)\s*:?/g, "").replace(/[:\s]+$/, "").trim(); return t.length < 40 ? t : ""; }
+  function postText(post) {
+    var content = post.querySelector(".content"); if (!content) return "";
+    var c = content.cloneNode(true), quotes = getS().quotes;
+    c.querySelectorAll("script,style,.codebox,.attachbox,dl.attachbox,.inline-attachment,iframe,video,audio,object,.signature,.kol-ui,img").forEach(function (x) { x.remove(); });
+    c.querySelectorAll("blockquote").forEach(function (q) {
+      if (!q.isConnected && !c.contains(q)) return;
+      var outer = q.parentElement && q.parentElement.closest("blockquote");
+      if (outer && c.contains(outer)) return;                      // nested quotes go with their outer quote
+      if (!quotes) { q.remove(); return; }
+      var who = quoteWho(q); q.querySelectorAll("cite, blockquote blockquote").forEach(function (x) { x.remove(); });
+      var t = flat(q, []).join("").replace(/\s+/g, " ").trim();
+      var r = document.createTextNode("\n" + (who ? who + " האט געשריבן: " : "ציטאט: ") + t + "\nסוף ציטאט.\n"); q.replaceWith(r);
+    });
+    return flat(c, []).join("");
+  }
+  function sentencesOf(text) {
+    var out = [];
+    text.split(/\n+/).forEach(function (line) {
+      line = line.replace(/\s+/g, " ").trim(); if (!line) return;
+      line.replace(/([.!?:;]+["'״”]?)\s+/g, "$1\u0001").split("\u0001").forEach(function (s) {
+        s = s.trim(); if (!s || !/[\u05d0-\u05eaA-Za-z0-9]/.test(s)) return;
+        if (out.length && (s.length < 4 || out[out.length - 1].length < 4)) out[out.length - 1] += " " + s; else out.push(s);
+      });
+    });
+    return out;
+  }
+  function authorOf(post) { var a = post.querySelector(".author .username, .author .username-coloured, .author strong a, .postprofile .username, .postprofile .username-coloured"); return a ? a.textContent.trim() : ""; }
+  function topicTitle() { var h = document.querySelector("h2.topic-title a, h2.topic-title, h2 a"); return h ? h.textContent.trim().slice(0, 200) : document.title.slice(0, 200); }
+  function postsOnPage() { return Array.prototype.slice.call(document.querySelectorAll("div.post[id^='p']")).filter(function (p) { return /^p\d+$/.test(p.id) && p.querySelector(".content"); }); }
+  function unreadPosts() {
+    var ps = postsOnPage(), u = ps.filter(function (p) { return p.classList.contains("unreadpost") || p.querySelector(".author .icon-red, .author a.unread i.icon-red"); });
+    if (!u.length) { var a = document.getElementById("unread"); if (a) { var start = -1; ps.forEach(function (p, i) { if (start < 0 && (a.compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING)) start = i; }); if (start >= 0) u = ps.slice(start); } }
+    return u;
+  }
+  function heard() { try { return JSON.parse(LS.getItem(HEARDK) || "[]"); } catch (e) { return []; } }
+  function markHeard(id) { var h = heard(); if (h.indexOf(id) < 0) { h.push(id); if (h.length > 3000) h = h.slice(-3000); LS.setItem(HEARDK, JSON.stringify(h)); } }
+
+  // ---------- playing ----------
+  var cur = null;   // {post, id, sents, i, state, list, li}
+  var UIs = {};     // post id -> {bar, play, pause, stop, report, rec, panel}
+  function speak(post, start, list, li) {
+    var id = post.id, s = sentencesOf(postText(post)), off = 0;
+    if (list && getS().names) { var a = authorOf(post); if (a) { s.unshift(a + " שרייבט:"); off = 1; } }
+    if (!s.length) { s = ["(אין דעם פאסט איז נישטא קיין טעקסט צו לייענען.)"]; }
+    if (cur && cur.id !== id) setPostState(cur.id, "idle");
+    cur = { post: post, id: id, sents: s, off: off, i: start || 0, state: "loading", list: list || null, li: li || 0 };
+    if (UIs[id]) UIs[id].played = true;
+    setPostState(id, "loading"); showBar();
+    H.play({ id: id, sentences: s, start: start || 0, speed: getS().speed });
+    if (list) post.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function stopAll(keepList) { if (cur) { setPostState(cur.id, "idle"); } H.stop(); if (!keepList) { var pa = getPA(); if (pa) { pa.active = false; setPA(pa); } } cur = null; showBar(); }
+  function next() {
+    if (!cur || !cur.list) { stopAll(); return; }
+    var L = cur.list, li = cur.li + 1;
+    if (li < L.length) { var p = document.getElementById(L[li]); if (p) return speak(p, 0, L, li); }
+    var was = cur; cur = null; showBar();
+    afterList(was);
+  }
+  H.on(function (e) {
+    if (e.type === "log") { try { console.warn("[kol] " + e.text); } catch (x) {} return; }
+    if (e.type === "made") { try { console.info("[kol] made " + e.audio_s + " s of speech in " + (e.ms / 1000).toFixed(1) + " s"); } catch (x) {} }
+    if (!cur || (e.id && e.id !== cur.id)) { if (e.type === "status") statusLine(e.text, e); return; }
+    if (e.type === "status") statusLine(e.text, e);
+    else if (e.type === "loading") { setPostState(cur.id, "loading"); }
+    else if (e.type === "sentence") { cur.i = e.i; cur.state = "playing"; setPostState(cur.id, "playing"); hiSentence(cur.id, e.i - cur.off); showBar(); }
+    else if (e.type === "paused") { cur.state = "paused"; setPostState(cur.id, "paused"); showBar(); }
+    else if (e.type === "resumed") { cur.state = "playing"; setPostState(cur.id, "playing"); showBar(); }
+    else if (e.type === "blocked") { cur.state = "blocked"; showBar(); }
+    else if (e.type === "end") { markHeard(cur.id); setPostState(cur.id, "done"); if (cur.list) next(); else { cur = null; showBar(); } }
+    else if (e.type === "error") { var eid = cur.id; showError(eid, e); setPostState(eid, "idle"); cur = null; showBar(); }
+  });
+
+  // ---------- visible error box (so Jacob can screenshot / copy it) ----------
+  function diagText(e) {
+    var d = ""; try { d = H.diag ? H.diag() : (H.kind + " " + H.version + " · " + navigator.userAgent); } catch (x) { d = String(x); }
+    return "Kol error " + new Date().toISOString().slice(0, 19) + "\n" + (e && e.stage ? "stage: " + e.stage + "\n" : "") + "error: " + (e && e.text || e) + "\n" + d + "\npage: " + location.pathname + location.search.slice(0, 60);
+  }
+  function copyText(t, b) {
+    function done(ok) { if (b) b.textContent = ok ? "✅ copied" : "⚠️ select the text and copy"; }
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(t).then(function () { done(true); }, function () { fallback(); }); return; } } catch (x) {}
+    fallback();
+    function fallback() { try { var ta = el("textarea"); ta.value = t; ta.style.cssText = "position:fixed;top:0;left:0;opacity:0"; document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, t.length); var ok = document.execCommand("copy"); ta.remove(); done(ok); } catch (x) { done(false); } }
+  }
+  function errorBox(where, t) {
+    var box = el("div", "kol-ui kol-errbox"); box.dir = "ltr";
+    box.appendChild(el("div", "kol-errtitle", "⚠️ Didn't play — tap 📋 and send this to Tab"));
+    var pre = el("div", "kol-errtext", t); box.appendChild(pre);
+    var row = el("div", "kol-row");
+    var cb = btn("📋 copy error", "", function () { copyText(t, cb); }); row.appendChild(cb);
+    if (H.selfTest) row.appendChild(btn("🔧 test", "", function () { openSettings(true); }));
+    row.appendChild(btn("✖", "kol-x", function () { box.remove(); }));
+    box.appendChild(row); return box;
+  }
+  function showError(id, e) {
+    var t = diagText(e); try { LS.setItem("kol-ivelt-lasterr", t); } catch (x) {}
+    var u = UIs[id];
+    if (u) { var old = u.bar.parentNode && u.bar.parentNode.querySelector(".kol-errbox"); if (old) old.remove(); u.bar.after(errorBox(u.bar, t)); }
+    else toast("⚠️ " + (e && e.text || e), 8000);
+  }
+
+  // ---------- per-post buttons ----------
+  function addPostUI(post) {
+    if (post.querySelector(".kol-ui")) return;
+    var body = post.querySelector(".postbody") || post, content = post.querySelector(".content");
+    var bar = el("div", "kol-ui kol-postbar"), u = { bar: bar };
+    u.play = btn("▶ לייען", "kol-main", function () {
+      if (cur && cur.id === post.id) { if (cur.state === "paused") H.resume(); else if (cur.state === "blocked") { H.unlock(); H.resume(); speak(post, cur.i); } return; }
+      H.unlock(); var ob = post.querySelector(".kol-errbox"); if (ob) ob.remove(); speak(post, 0);
+    }, "Read this post aloud");
+    u.pause = btn("⏸", "", function () { if (!cur) return; if (cur.state === "paused") H.resume(); else H.pause(); }, "Pause");
+    u.stop = btn("⏹", "", function () { stopAll(); }, "Stop");
+    u.report = btn("⚠️ פאלש", "", function () { togglePanel(post, "report"); }, "Report wrong words");
+    u.rec = btn("🎤 זאג עס", "", function () { togglePanel(post, "rec"); }, "Record how it should sound");
+    u.heard = el("span", "kol-heard", heard().indexOf(post.id) >= 0 ? "✓ געהערט" : "");
+    [u.play, u.pause, u.stop, u.report, u.rec, u.heard].forEach(function (x) { bar.appendChild(x); });
+    u.panel = el("div", "kol-ui kol-panel"); u.panel.hidden = true;
+    body.insertBefore(bar, content && content.parentNode === body ? content : body.firstChild);
+    bar.after(u.panel);
+    UIs[post.id] = u; setPostState(post.id, "idle");
+  }
+  function setPostState(id, st) {
+    var u = UIs[id]; if (!u) return; var post = document.getElementById(id);
+    var active = st === "playing" || st === "paused" || st === "loading";
+    u.pause.hidden = u.stop.hidden = !active; u.report.hidden = u.rec.hidden = !(active || u.played || !u.panel.hidden);
+    u.play.textContent = st === "loading" ? "⏳ גרייט צו…" : st === "playing" ? "🔊 לייענט…" : st === "paused" ? "▶ ווייטער" : "▶ לייען";
+    u.play.disabled = st === "loading" || st === "playing";
+    u.pause.textContent = st === "paused" ? "▶" : "⏸";
+    if (st === "done") u.heard.textContent = "✓ געהערט";
+    if (post) post.classList.toggle("kol-active", active);
+  }
+
+  // ---------- Report + Record panel ----------
+  var marked = {};   // post id -> {sentence index -> {word index: true}}
+  function togglePanel(post, mode) {
+    var u = UIs[post.id], p = u.panel;
+    if (!p.hidden && p.dataset.mode === mode) { p.hidden = true; return; }
+    p.dataset.mode = mode; p.hidden = false; p.innerHTML = "";
+    var sents = sentencesOf(postText(post)), m = marked[post.id] = marked[post.id] || {};
+    p.appendChild(el("div", "kol-hint", mode === "report" ? "טאפ די ווערטער וואס ער זאגט פאלש \u2068(Tap the words it says wrong)\u2069:" : "טאפ די ווערטער, דערנאך 🎤 און זאג זיי ריכטיג \u2068(Tap the words, then record how they should sound)\u2069:"));
+    var words = el("div", "kol-words"); words.dir = "rtl";
+    sents.forEach(function (s, si) {
+      var g = el("span", "kol-sent"); g.dataset.si = si;
+      s.split(/\s+/).forEach(function (w, wi) {
+        var c = el("span", "kol-w" + (m[si] && m[si][wi] ? " on" : ""), w); c.setAttribute("role", "button"); c.tabIndex = 0;
+        c.addEventListener("click", function () { m[si] = m[si] || {}; if (m[si][wi]) delete m[si][wi]; else m[si][wi] = true; c.classList.toggle("on"); });
+        g.appendChild(c); g.appendChild(document.createTextNode(" "));
+      });
+      words.appendChild(g);
+    });
+    p.appendChild(words);
+    var note = el("textarea", "kol-note", null, { rows: "2", placeholder: mode === "report" ? "ווי זאגט מען עס? \u2068(optional note)\u2069" : "נאטיץ \u2068(optional)\u2069", dir: "rtl" });
+    p.appendChild(note);
+    var row = el("div", "kol-row"); p.appendChild(row);
+    function picked() {
+      var out = []; Object.keys(m).forEach(function (si) { Object.keys(m[si]).forEach(function (wi) { var s = sents[+si] || ""; out.push({ si: +si, wi: +wi, w: s.split(/\s+/)[+wi] || "", sentence: s }); }); });
+      return out.sort(function (a, b) { return a.si - b.si || a.wi - b.wi; });
+    }
+    function base() {
+      var pk = picked(), si = pk.length ? pk[0].si : (cur && cur.id === post.id ? Math.max(0, cur.i - cur.off) : 0);
+      return { source: "ivelt", app: H.kind + " " + H.version, test: isTest(), post_id: post.id, post_url: location.origin + location.pathname + "?p=" + post.id.slice(1) + "#" + post.id,
+        topic: topicTitle(), author: authorOf(post), words: pk.map(function (x) { return x.w; }), picked: pk, sentence: sents[si] || "", sentence_i: si,
+        note: note.value.trim(), voice: H.voiceTag ? H.voiceTag() : "", speed: getS().speed, at_client: new Date().toISOString() };
+    }
+    if (mode === "report") {
+      row.appendChild(btn("✅ שיק / Send", "kol-main", function () {
+        var b = base(); if (!b.words.length && !b.note) { toast("טאפ קודם די פאלשע ווערטער \u2068(tap the wrong words first)\u2069"); return; }
+        H.enqueue({ kind: "report", uid: uid(), data: b }).then(function (r) { toast(r && r.sent ? "✅ געשיקט" : "✅ געהאלטן, וועט שיקן ווען אנליין \u2068(saved, sends when online)\u2069"); refreshQueue(); });
+        marked[post.id] = {}; p.hidden = true; setPostState(post.id, cur && cur.id === post.id ? cur.state : "idle");
+      }));
+      row.appendChild(btn("🎤 זאג עס", "", function () { togglePanel(post, "rec"); }));
+    } else recorder(row, base, function () { marked[post.id] = {}; p.hidden = true; setPostState(post.id, cur && cur.id === post.id ? cur.state : "idle"); });
+    row.appendChild(btn("✖", "kol-x", function () { p.hidden = true; setPostState(post.id, cur && cur.id === post.id ? cur.state : "idle"); }, "Close"));
+    if (cur && cur.id === post.id) hiSentence(post.id, cur.i - cur.off);
+  }
+  function hiSentence(id, si) {
+    var u = UIs[id]; if (!u || u.panel.hidden) return;
+    u.panel.querySelectorAll(".kol-sent").forEach(function (g) { g.classList.toggle("now", +g.dataset.si === si); });
+  }
+  function recorder(row, base, done) {
+    var st = el("span", "kol-recst", ""), rec = null, chunks = [], blob = null, mime = "", t0 = 0, tm = null, stream = null, aud = null;
+    var bRec = btn("🎤 רעקארד", "kol-main kol-rec", start), bStop = btn("⏹ סטאפ", "kol-rec", stop), bPlay = btn("▶ הער", "", function () { if (aud) { aud.currentTime = 0; aud.play(); } }),
+      bRe = btn("🔁", "", start, "Record again"), bSend = btn("✅ שיק / Send", "kol-main", send);
+    bStop.hidden = bPlay.hidden = bRe.hidden = bSend.hidden = true;
+    [bRec, bStop, bPlay, bRe, bSend, st].forEach(function (x) { row.appendChild(x); });
+    function pick() { var c = ["audio/mp4", "audio/mp4;codecs=mp4a.40.2", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
+      for (var i = 0; i < c.length; i++) if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(c[i])) return c[i]; return ""; }
+    async function start() {
+      if (cur && cur.state === "playing") H.pause();
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+      catch (e) { st.textContent = "⚠️ מיקראפאן נישט ערלויבט \u2068(mic not allowed)\u2069"; return; }
+      mime = pick(); chunks = []; blob = null;
+      rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+      rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = function () {
+        stream.getTracks().forEach(function (t) { t.stop(); }); clearInterval(tm);
+        blob = new Blob(chunks, { type: (rec.mimeType || mime || "audio/mp4").split(";")[0] });
+        aud = new Audio(URL.createObjectURL(blob)); st.textContent = ((Date.now() - t0) / 1000).toFixed(1) + " s";
+        bRec.hidden = bStop.hidden = true; bPlay.hidden = bRe.hidden = bSend.hidden = false;
+      };
+      rec.start(500); t0 = Date.now(); bRec.hidden = bPlay.hidden = bRe.hidden = bSend.hidden = true; bStop.hidden = false;
+      tm = setInterval(function () { var s = (Date.now() - t0) / 1000; st.textContent = "🔴 " + s.toFixed(0) + " / 20 s"; if (s >= 20) stop(); }, 250);
+    }
+    function stop() { if (rec && rec.state !== "inactive") rec.stop(); }
+    function send() {
+      if (!blob) return; var b = base(); b.dur_s = +((blob.size && aud && isFinite(aud.duration)) ? aud.duration : 0).toFixed(1) || null; b.mime = blob.type;
+      H.enqueue({ kind: "recording", uid: uid(), data: b, blob: blob }).then(function (r) { toast(r && r.sent ? "✅ געשיקט" : "✅ געהאלטן, וועט שיקן ווען אנליין \u2068(saved, sends when online)\u2069"); refreshQueue(); });
+      done();
+    }
+  }
+
+  // ---------- Play all unread ----------
+  function getPA() { try { var x = JSON.parse(LS.getItem(PLAYK) || "null"); return x && Date.now() - x.t < 6 * 3600e3 ? x : null; } catch (e) { return null; } }
+  function setPA(x) { if (x) { x.t = x.t || Date.now(); LS.setItem(PLAYK, JSON.stringify(x)); } else LS.removeItem(PLAYK); }
+  function topicIdOf(u) { var m = String(u).match(/[?&]t=(\d+)/); return m ? m[1] : null; }
+  function playList(list, fromNav) {
+    if (!list.length) { toast("קיין נייע פאסטן \u2068(no unread posts here)\u2069"); return false; }
+    H.unlock(); speak(document.getElementById(list[0]), 0, list, 0); return true;
+  }
+  function nextPageUrl() { var a = document.querySelector(".pagination .next a, .pagination a[rel=next], a.arrow-next, .pagination li.arrow.next a"); return a ? a.href : null; }
+  function afterList(was) {
+    var pa = getPA(), posts = postsOnPage(), lastId = posts.length ? posts[posts.length - 1].id : null;
+    if (pa && pa.active) {
+      var np = nextPageUrl();
+      if (was.list[was.list.length - 1] === lastId && np) { pa.page = np; setPA(pa); toast("⏭ ווייטער צום קומענדיגן בלאט"); location.href = np; return; }
+      pa.ti = (pa.ti || 0) + 1; setPA(pa);
+      if (pa.topics && pa.ti < pa.topics.length) { toast("⏭ קומענדיגע אשכול (" + (pa.ti + 1) + "/" + pa.topics.length + ")"); location.href = pa.topics[pa.ti]; return; }
+      pa.active = false; setPA(pa); toast("✅ אלעס געהערט \u2068(all unread heard)\u2069", 5000); return;
+    }
+    toast("✅ אלעס געהערט \u2068(all unread heard)\u2069", 4000);
+  }
+  function unreadTopicLinks() {
+    var seen = {}, out = [];
+    document.querySelectorAll("a[href*='view=unread']").forEach(function (a) { var t = topicIdOf(a.href); if (t && !seen[t]) { seen[t] = 1; out.push(a.href); } });
+    return out;
+  }
+  function addTopBar() {
+    if (document.querySelector(".kol-topbar")) return;
+    var isTopic = /viewtopic\.php/.test(location.pathname) && postsOnPage().length;
+    var bar = el("div", "kol-ui kol-topbar"); bar.dir = "rtl";
+    if (isTopic) {
+      var u = unreadPosts();
+      bar.appendChild(btn(u.length ? "▶ לייען אלע נייע (" + u.length + ") · Play all unread" : "▶ לייען דעם גאנצן בלאט · Play whole page", "kol-main kol-big", function () {
+        var list = (u.length ? u : postsOnPage()).map(function (p) { return p.id; });
+        setPA({ active: true, mode: u.length ? "unread" : "page", topics: [location.href], ti: 0 }); playList(list);
+      }));
+      var first = document.querySelector("div.post[id^='p']"); if (!first) return; first.parentNode.insertBefore(bar, first);
+    } else {
+      var links = unreadTopicLinks(), onSearchUnread = /search_id=unreadposts/.test(location.search);
+      var label = links.length ? "▶ לייען אלע נייע (" + links.length + " אשכולות) · Play all unread" : "▶ לייען אלע נייע · Play all unread";
+      bar.appendChild(btn(label, "kol-main kol-big", function () {
+        if (!links.length) { if (onSearchUnread) { toast("קיין נייע פאסטן \u2068(no unread posts)\u2069"); return; } setPA({ active: true, mode: "unread", find: true }); location.href = location.origin + "/forum/search.php?search_id=unreadposts"; return; }
+        setPA({ active: true, mode: "unread", topics: links, ti: 0 }); location.href = links[0];
+      }));
+      var host = document.querySelector("#page-body") || document.body; host.insertBefore(bar, host.firstChild);
+      var pa = getPA(); if (pa && pa.active && pa.find && onSearchUnread) { if (links.length) { setPA({ active: true, mode: "unread", topics: links, ti: 0 }); location.href = links[0]; } else { setPA(null); toast("קיין נייע פאסטן \u2068(no unread posts)\u2069"); } }
+    }
+  }
+  function resumePlayAll() {
+    var pa = getPA(); if (!pa || !pa.active || !/viewtopic\.php/.test(location.pathname)) return;
+    var here = topicIdOf(location.href) || topicIdOf((document.querySelector("h2.topic-title a") || {}).href || "");
+    var want = pa.topics && pa.topics[pa.ti || 0] ? topicIdOf(pa.topics[pa.ti || 0]) : null;
+    if (want && here && want !== here && !(pa.page && topicIdOf(pa.page) === here)) return;   // he went somewhere else: don't take over
+    var u = unreadPosts(); var list = (u.length ? u : (pa.page ? postsOnPage() : [])).map(function (p) { return p.id; });
+    if (!list.length) { afterList({ list: [null] }); return; }
+    setTimeout(function () { playList(list, true); }, 600);
+  }
+
+  // ---------- floating player bar + settings ----------
+  var fbar = null, statusEl = null, qEl = null;
+  function showBar() {
+    if (!fbar) {
+      fbar = el("div", "kol-ui kol-fbar"); fbar.dir = "rtl";
+      fbar.innerHTML = "";
+      fbar.appendChild(el("span", "kol-ftxt"));
+      fbar.appendChild(btn("⏸", "kol-fpause", function () { if (!cur) return; if (cur.state === "blocked") { H.unlock(); speak(cur.post, Math.max(0, cur.i), cur.list, cur.li); return; } if (cur.state === "paused") H.resume(); else H.pause(); }, "Pause / continue"));
+      fbar.appendChild(btn("⏹", "", function () { stopAll(); }, "Stop"));
+      fbar.appendChild(btn("⏭", "kol-fnext", function () { if (cur && cur.list) { H.stop(); markHeard(cur.id); setPostState(cur.id, "done"); next(); } else stopAll(); }, "Next post"));
+      fbar.appendChild(btn("🐢", "", function () { changeSpeed(-0.1); }, "Slower"));
+      fbar.appendChild(el("span", "kol-fspeed"));
+      fbar.appendChild(btn("🐇", "", function () { changeSpeed(0.1); }, "Faster"));
+      fbar.appendChild(btn("⚙️", "", openSettings, "Settings"));
+      document.body.appendChild(fbar);
+    }
+    var s = getS();
+    fbar.querySelector(".kol-fspeed").textContent = s.speed.toFixed(1) + "×";
+    if (!cur) { fbar.classList.add("idle"); fbar.querySelector(".kol-ftxt").textContent = "קול"; fbar.querySelector(".kol-fpause").hidden = true; fbar.querySelector(".kol-fnext").hidden = true; return; }
+    fbar.classList.remove("idle"); fbar.querySelector(".kol-fpause").hidden = false; fbar.querySelector(".kol-fnext").hidden = !cur.list;
+    var lbl = cur.state === "blocked" ? "▶ טאפ צו הערן \u2068(tap to continue)\u2069" : cur.state === "loading" ? "⏳ " + (cur.load || "גרייט צו…") :
+      (cur.list ? "פאסט " + (cur.li + 1) + "/" + cur.list.length + " · " : "") + "זאץ " + (Math.max(0, cur.i) + 1) + "/" + cur.sents.length;
+    fbar.querySelector(".kol-ftxt").textContent = lbl;
+    fbar.querySelector(".kol-fpause").textContent = cur.state === "paused" || cur.state === "blocked" ? "▶" : "⏸";
+  }
+  function statusLine(t, e) { if (cur && cur.state === "loading" && e && e.pct != null) { cur.load = "קול לאדנט " + e.pct + "%"; showBar(); } if (statusEl) statusEl.textContent = t === "ready" ? "✅ גרייט" : t; }
+  function changeSpeed(d) {
+    var s = Math.round(Math.min(1.3, Math.max(0.8, getS().speed + d)) * 10) / 10; setS("speed", s); showBar();
+    var sp = document.querySelector(".kol-speedval"); if (sp) sp.textContent = s.toFixed(1) + "×";
+    if (cur && (cur.state === "playing" || cur.state === "paused")) speak(cur.post, Math.max(0, cur.i), cur.list, cur.li);   // restart this sentence at the new speed
+  }
+  function refreshQueue() { if (!qEl) return; H.queueStatus().then(function (q) { qEl.textContent = q.waiting ? "⏳ " + q.waiting + " ווארטן צו שיקן \u2068(waiting to send)\u2069" + (q.error ? " · " + q.error : "") : "✅ אלעס געשיקט (" + (q.sent || 0) + ")"; }); }
+  function openSettings(runTest) {
+    var old = document.querySelector(".kol-sheet"); if (old) { old.remove(); qEl = statusEl = null; if (runTest !== true) return; }
+    var sh = el("div", "kol-ui kol-sheet"); sh.dir = "rtl"; var s = getS();
+    sh.appendChild(el("h3", null, "⚙️ קול – Settings"));
+    var sp = el("div", "kol-row"); sp.appendChild(el("span", null, "גיכקייט \u2068(speed)\u2069: ")); sp.appendChild(btn("🐢 −", "", function () { changeSpeed(-0.1); }));
+    sp.appendChild(el("b", "kol-speedval", s.speed.toFixed(1) + "×")); sp.appendChild(btn("🐇 +", "", function () { changeSpeed(0.1); })); sh.appendChild(sp);
+    function chk(k, t) { var l = el("label", "kol-chk"), c = el("input"); c.type = "checkbox"; c.checked = !!s[k]; c.onchange = function () { setS(k, c.checked); }; l.appendChild(c); l.appendChild(document.createTextNode(" " + t)); sh.appendChild(l); }
+    chk("quotes", "לייען אויך ציטאטן \u2068(read quoted text too)\u2069");
+    chk("names", "זאג ווער ס'האט געשריבן ביי 'לייען אלע' \u2068(say who wrote it in Play all)\u2069");
+    qEl = el("div", "kol-q"); sh.appendChild(qEl); refreshQueue();
+    var qr = el("div", "kol-row"); qr.appendChild(btn("📤 שיק יעצט \u2068(send now)\u2069", "", function () { H.flush().then(refreshQueue); })); sh.appendChild(qr);
+    statusEl = el("div", "kol-small"); sh.appendChild(statusEl);
+    var inf = el("div", "kol-small kol-ltr"); sh.appendChild(inf);
+    var up = el("div", "kol-up"); sh.appendChild(up);
+    H.info().then(function (i) {
+      var v = i.voice || {};
+      inf.textContent = (H.kind === "extension" ? "Chrome extension " : "iPhone script ") + H.version + " · voice: pocket" + (v.step ? " step " + v.step : "") + (v.built ? " (" + v.built.slice(0, 10) + ")" : "") + (v.label && !/^pocket/.test(v.label) ? " " + v.label : "") + (v.sha ? " · " + v.sha.slice(0, 8) : "") + (i.threads ? " · " + i.threads + " thread" + (i.threads > 1 ? "s" : "") : "") + " · speech made on this device";
+      up.innerHTML = "";
+      if (i.update) up.appendChild(el("div", "kol-small", i.update));
+      if (i.voiceUpdate) up.appendChild(btn("⬇ נייע קול (" + i.voiceUpdate.mb + " MB) · Get the new voice", "kol-main", function (ev) { ev.target.disabled = true; ev.target.textContent = "⏳…"; H.voiceUpdate().then(function (r) { ev.target.textContent = r && r.ok ? "✅ " + (r.text || "") : "⚠️ " + (r && r.error || ""); }); }));
+      if (i.appUpdateUrl) { var a = el("a", "kol-b kol-main", "⬇ נייע ווערסיע " + i.latestVersion + " · New version", { href: i.appUpdateUrl, target: "_blank", rel: "noopener" }); up.appendChild(a); }
+      var chkb = btn("🔄 קוק פאר נייעס \u2068(check for updates)\u2069", "", function () { chkb.textContent = "⏳"; H.checkUpdates().then(function () { sh.remove(); openSettings(); }); }); up.appendChild(chkb);
+    });
+    if (H.selfTest) {
+      var tr = el("div", "kol-row"), diag = el("div", "kol-diag kol-ltr"), lines = {}, order = [];
+      function line(t, k) { if (!lines[k]) { lines[k] = el("div", null, t); order.push(k); diag.appendChild(lines[k]); } else lines[k].textContent = t; }
+      function runIt() {
+        diag.innerHTML = ""; lines = {}; diag.hidden = false;
+        H.selfTest(line).catch(function (x) { line("❌ test crashed: " + (x && x.message || x) + " DONE", "end"); }).then(function () {
+          var all = order.map(function (k) { return lines[k].textContent; }).join("\n") + "\n" + (H.diag ? H.diag() : "");
+          var cb = btn("📋 copy test result", "", function () { copyText(all, cb); }); diag.appendChild(cb);
+        });
+      }
+      tr.appendChild(btn("🔧 טעסט \u2068(test: download · engine · sound)\u2069", "kol-main", function () { runIt(); }));
+      sh.appendChild(tr); diag.hidden = true; sh.appendChild(diag);
+      if (H.setOut) {
+        var sp2 = el("div", "kol-row"), om = H.getOut();
+        sp2.appendChild(el("span", "kol-small", "🔈 sound path: "));
+        var b1 = btn((om === "ctx" ? "● " : "○ ") + "normal", "", function () { H.setOut("ctx"); sh.remove(); openSettings(); });
+        var b2 = btn((om === "element" ? "● " : "○ ") + "via audio player (try if silent)", "", function () { H.setOut("element"); sh.remove(); openSettings(); });
+        sp2.appendChild(b1); sp2.appendChild(b2); sh.appendChild(sp2);
+      }
+      var le = LS.getItem("kol-ivelt-lasterr");
+      if (le) { var lr = el("div", "kol-row"); var lb = btn("📋 copy last error", "", function () { copyText(le, lb); }); lr.appendChild(lb); lr.appendChild(el("span", "kol-small kol-ltr", le.split("\n").slice(1, 3).join(" · ").slice(0, 120))); sh.appendChild(lr); }
+      if (runTest === true) runIt();
+    }
+    sh.appendChild(btn("✖ פארמאך", "kol-x", function () { sh.remove(); qEl = statusEl = null; }));
+    document.body.appendChild(sh);
+    if (runTest === true) sh.scrollIntoView && sh.scrollIntoView();
+  }
+
+  function scan() { postsOnPage().forEach(addPostUI); }
+  function boot() {
+    scan(); addTopBar(); showBar(); resumePlayAll();
+    new MutationObserver(function () { scan(); }).observe(document.body, { childList: true, subtree: true });
+    setTimeout(function () { H.flush().catch(function () {}); }, 3000);
+    window.addEventListener("online", function () { H.flush().catch(function () {}); });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
+})();
