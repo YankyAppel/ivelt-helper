@@ -1477,7 +1477,7 @@ var KOL_TEXT_DATA = {"version":"kaggle-2.9 (2026-11-01, abbreviations + referenc
         var res = await H.stt(pcm);
         if (!res || res.error) throw new Error(res && res.error || "no answer");
         var t = (res.text || "").trim();
-        if (t) { ta.focus(); pendingFixes.delete(ta); ta.dataset.kolDictationInput = "1"; trackFix(ta, KolIvelt.insertText(ta, t + " ")); note.textContent = "✅ " + (res.ms ? (res.ms / 1000).toFixed(1) + " s" : ""); } else note.textContent = "האב גארנישט געהערט \u2068(heard nothing)\u2069";
+        if (t) { ta.focus(); watchFixes(ta); pendingFixes.delete(ta); ta.dataset.kolDictationInput = "1"; trackFix(ta, KolIvelt.insertText(ta, t + " ")); note.textContent = "✅ " + (res.ms ? (res.ms / 1000).toFixed(1) + " s" : ""); } else note.textContent = "האב גארנישט געהערט \u2068(heard nothing)\u2069";
       } catch (e) { note.textContent = "⚠️ " + (e && e.message || e); }
       finally { b.disabled = false; }
     }
