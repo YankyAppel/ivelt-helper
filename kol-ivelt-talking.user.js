@@ -1396,46 +1396,6 @@ var KOL_TEXT_DATA = {"version":"kaggle-2.9 (2026-11-01, abbreviations + referenc
 
   // ---------- 🎙 talk-to-text in the post / reply box (1.1.0): record here, the listening model (/listen/'s) runs on this device ----------
   function sttSupported() { return !!(H.stt && navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
-  var pendingFixes = new WeakMap();
-  function showFix(ta, fix) {
-    var old = ta.parentElement && ta.parentElement.querySelector(".kol-transcript-fix");
-    if (old) old.remove();
-    var row = el("div", "kol-ui kol-transcript-fix");
-    row.style.cssText = "display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:6px 0;padding:6px 8px;border:1px solid #e0c060;border-radius:10px;background:#fffbea";
-    var text = el("span", "kol-small");
-    text.textContent = "פאר טרענירונג: " + fix.original + " ← " + fix.corrected;
-    var send = btn("שיקן", "", async function () {
-      send.disabled = true; send.textContent = "שיקט…";
-      try {
-        await H.enqueue({ kind: "report", uid: uid(), data: {
-          action: "ivelt_transcript_fix", source: "ivelt_talking",
-          original: fix.original, corrected: fix.corrected,
-          context: location.href.slice(0, 500), training_use: "transcription_corrections",
-          created_at: new Date().toISOString()
-        } });
-        row.remove(); toast("✅ געהאלטן פאר טרענירונג");
-      } catch (e) { send.disabled = false; send.textContent = "ווידער שיקן"; error.textContent = "⚠️ " + (e && e.message || e); }
-    }, "שיקן די תיקון פאר טרענירונג");
-    var dismiss = btn("×", "", function () { row.remove(); }, "נישט שיקן");
-    var error = el("span", "kol-small");
-    row.append(text, send, dismiss, error); ta.after(row);
-  }
-  function watchFixes(ta) {
-    if (ta.dataset.kolFixWatch) return; ta.dataset.kolFixWatch = "1";
-    ta.addEventListener("input", function () {
-      var fix = pendingFixes.get(ta); if (!fix) return;
-      if (Date.now() - fix.createdAt > 60000) { pendingFixes.delete(ta); return; }
-      var before = fix.snapshot.slice(0, fix.start), after = fix.snapshot.slice(fix.start + fix.text.length);
-      if (!ta.value.startsWith(before) || !ta.value.endsWith(after)) return;
-      var corrected = ta.value.slice(before.length, ta.value.length - after.length || undefined).trim();
-      if (!corrected || corrected === fix.text) return;
-      pendingFixes.delete(ta); showFix(ta, { original: fix.text, corrected: corrected });
-    });
-  }
-  function trackFix(ta, inserted) {
-    watchFixes(ta);
-    pendingFixes.set(ta, { start: inserted.start, text: inserted.text.trim(), snapshot: ta.value, createdAt: Date.now() });
-  }
   async function to16k(chunks, sr) {
     var n = 0, i, o = 0; for (i = 0; i < chunks.length; i++) n += chunks[i].length; var x = new Float32Array(n); for (i = 0; i < chunks.length; i++) { x.set(chunks[i], o); o += chunks[i].length; }
     if (sr === 16000) return x;
@@ -1471,7 +1431,7 @@ var KOL_TEXT_DATA = {"version":"kaggle-2.9 (2026-11-01, abbreviations + referenc
         var res = await H.stt(pcm);
         if (!res || res.error) throw new Error(res && res.error || "no answer");
         var t = (res.text || "").trim();
-        if (t) { ta.focus(); trackFix(ta, KolIvelt.insertText(ta, t + " ")); note.textContent = "✅ " + (res.ms ? (res.ms / 1000).toFixed(1) + " s" : ""); } else note.textContent = "האב גארנישט געהערט \u2068(heard nothing)\u2069";
+        if (t) { ta.focus(); KolIvelt.insertText(ta, t + " "); note.textContent = "✅ " + (res.ms ? (res.ms / 1000).toFixed(1) + " s" : ""); } else note.textContent = "האב גארנישט געהערט \u2068(heard nothing)\u2069";
       } catch (e) { note.textContent = "⚠️ " + (e && e.message || e); }
       finally { b.disabled = false; }
     }
@@ -1480,7 +1440,7 @@ var KOL_TEXT_DATA = {"version":"kaggle-2.9 (2026-11-01, abbreviations + referenc
   boxTools.push(sttTool);
   window.KolIvelt = {
     version: H.version,
-    insertText: function (ta, text) { var s = typeof ta.selectionStart === "number" ? ta.selectionStart : ta.value.length, e = typeof ta.selectionEnd === "number" ? ta.selectionEnd : s; ta.value = ta.value.slice(0, s) + text + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + text.length; ta.dispatchEvent(new Event("input", { bubbles: true })); return { start: s, end: e, text: text }; }
+    insertText: function (ta, text) { var s = typeof ta.selectionStart === "number" ? ta.selectionStart : ta.value.length, e = typeof ta.selectionEnd === "number" ? ta.selectionEnd : s; ta.value = ta.value.slice(0, s) + text + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + text.length; ta.dispatchEvent(new Event("input", { bubbles: true })); }
   };
   function boot() {
     postBoxes();
