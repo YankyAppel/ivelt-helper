@@ -1409,15 +1409,16 @@ var KOL_TEXT_DATA = {"version":"kaggle-2.9 (2026-11-01, abbreviations + referenc
     function show() { var on = getS().stt; b.hidden = !on; note.hidden = !on; }
     show(); document.addEventListener("kol-settings", show);
     async function startRec() {
+      var st = null;
       try {
-        var st = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+        st = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
         var ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") await ac.resume();
         var src = ac.createMediaStreamSource(st), sp = ac.createScriptProcessor(4096, 1, 1), chunks = [];
         sp.onaudioprocess = function (e) { chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
         src.connect(sp); sp.connect(ac.destination);
         rec = { st: st, ac: ac, sp: sp, src: src, chunks: chunks, t: Date.now(), timer: setTimeout(function () { if (rec) stopRec(); }, 60000) };
         b.textContent = "⏹ שטעל אפ \u2068(stop)\u2069"; b.classList.add("on"); note.textContent = "הערט… \u2068(listening, up to 60 s)\u2069";
-      } catch (e) { note.textContent = "⚠️ מיקראפאן: " + (e && e.message || e); rec = null; }
+      } catch (e) { if (st) try { st.getTracks().forEach(function (t) { t.stop(); }); } catch (x) {} note.textContent = "⚠️ מיקראפאן: " + (e && e.message || e); rec = null; }
     }
     async function stopRec() {
       var r = rec; rec = null; clearTimeout(r.timer); b.textContent = "🎙 רעד \u2068(talk)\u2069"; b.classList.remove("on"); b.disabled = true;
