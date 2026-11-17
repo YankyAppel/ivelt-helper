@@ -137,15 +137,24 @@
   function trackCorrection(textarea, inserted) {
     const snapshot = textarea.value;
     pending.set(textarea, { ...inserted, snapshot, createdAt: Date.now() });
+    const started = Date.now();
     const check = () => {
       const item = pending.get(textarea);
-      if (!item || Date.now() - item.createdAt > 30000 || textarea.value === item.snapshot) return;
-      pending.delete(textarea);
+      if (!item || Date.now() - started > 30000) {
+        clearInterval(timer);
+        return;
+      }
       const current = textarea.value;
       const before = item.snapshot.slice(0, item.start);
       const after = item.snapshot.slice(item.start + item.text.length + 1);
-      if (!current.startsWith(before) || !current.endsWith(after)) return;
-      const corrected = current.slice(before.length, current.length - after.length || undefined).trim();
+      if (current === item.snapshot || !current.startsWith(before) || !current.endsWith(after)) return;
+      const middle = current.slice(before.length, current.length - after.length || undefined).trim();
+      // Typing after the dictated text is normal drafting, not a correction.
+      // Keep watching so a later edit to the dictated text is still captured.
+      if (!middle || middle === item.text || middle.startsWith(`${item.text} `)) return;
+      pending.delete(textarea);
+      clearInterval(timer);
+      const corrected = middle;
       if (!corrected || corrected === item.text) return;
       showCorrection(textarea, {
         original: item.text,
@@ -153,7 +162,8 @@
         context: current.slice(Math.max(0, item.start - 100), Math.min(current.length, item.start + corrected.length + 100))
       });
     };
-    setTimeout(check, 900);
+    const timer = setInterval(check, 900);
+    check();
   }
 
   function addBox(textarea) {
