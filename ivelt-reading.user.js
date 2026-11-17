@@ -160,10 +160,11 @@
   }
 
   function playUnread() {
-    const list = posts().filter((post) => post.classList.contains('bg1') || post.classList.contains('bg2'));
-    const queue = list.length ? list : posts();
+    const queue = posts().filter((post) => post.classList.contains('unread') ||
+      post.matches('[data-unread="1"]') ||
+      post.querySelector('.unread, a.unread, .post-unread, [data-unread="1"]'));
     if (queue.length) speak(queue[0], queue, 0);
-    else toast('קיין תגובות נישט געפונען');
+    else toast('קיין אומגעלייענטע תגובות נישט געפונען');
   }
 
   function openSettings() {
